@@ -1,0 +1,29 @@
+{
+  "name": "isolated-review",
+  "version": "0.1.0",
+  "description": "Deep code review of a single file in isolation",
+  "type": "module",
+  "bin": { "review": "dist/cli.js" },
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "openai": "^4.70.0",
+    "ora": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": { "node": ">=20" }
+}
