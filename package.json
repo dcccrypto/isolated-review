@@ -2,6 +2,15 @@
   "name": "isolated-review",
   "version": "0.1.0",
   "description": "Deep code review of a single file in isolation",
+  "license": "Apache-2.0",
+  "author": "Khubair Nasir",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dcccrypto/isolated-review.git"
+  },
+  "bugs": { "url": "https://github.com/dcccrypto/isolated-review/issues" },
+  "homepage": "https://github.com/dcccrypto/isolated-review#readme",
+  "keywords": ["cli", "code-review", "ai", "claude", "openai", "anthropic"],
   "type": "module",
   "bin": { "review": "dist/cli.js" },
   "scripts": {

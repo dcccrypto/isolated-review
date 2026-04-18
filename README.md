@@ -2,6 +2,8 @@
 
 Deep code review of a single file, in isolation, from the command line. The tool reads one file — never the rest of the repo — sends it to an AI model with a focused reviewer prompt, and prints a structured set of findings. Optionally, a second model verifies and refines the first pass.
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 ## Install
 
 ```bash
@@ -121,3 +123,7 @@ pnpm test:watch          # vitest in watch mode
 pnpm typecheck           # tsc --noEmit
 pnpm build               # emit dist/
 ```
+
+## License
+
+[Apache 2.0](LICENSE) © Khubair Nasir
