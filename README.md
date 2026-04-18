@@ -2,15 +2,35 @@
 
 Deep code review of a single file, in isolation, from the command line. The tool reads one file — never the rest of the repo — sends it to an AI model with a focused reviewer prompt, and prints a structured set of findings. Optionally, a second model verifies and refines the first pass.
 
+[![npm version](https://img.shields.io/npm/v/isolated-review.svg)](https://www.npmjs.com/package/isolated-review)
+[![npm downloads](https://img.shields.io/npm/dm/isolated-review.svg)](https://www.npmjs.com/package/isolated-review)
+[![node](https://img.shields.io/node/v/isolated-review.svg)](https://www.npmjs.com/package/isolated-review)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
+```bash
+npm install -g isolated-review
+review keys        # one-time setup
+review <file>
+```
 
 ## Install
 
+From npm (recommended):
+
 ```bash
-pnpm install
-pnpm build
-pnpm link --global
-review --help
+npm install -g isolated-review
+# or
+pnpm add -g isolated-review
+# or
+bun install -g isolated-review
+```
+
+From source:
+
+```bash
+git clone https://github.com/dcccrypto/isolated-review
+cd isolated-review
+pnpm install && pnpm build && pnpm link --global
 ```
 
 ## API keys
