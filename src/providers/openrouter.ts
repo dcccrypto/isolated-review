@@ -3,6 +3,7 @@ import type { Provider, ReviewResult } from './types.js';
 import { buildReviewMessages } from '../prompts/reviewPrompt.js';
 import { buildVerifyMessages } from '../prompts/verifyPrompt.js';
 import { loadKeys } from '../utils/config.js';
+import { parseReviewResult } from './parse.js';
 
 function client() {
   const { openrouter } = loadKeys();
@@ -27,17 +28,7 @@ async function call(model: string, system: string, user: string): Promise<Review
     ]
   });
   const raw = res.choices[0]?.message?.content ?? '';
-  const trimmed = stripCodeFences(raw.trim());
-  try {
-    return JSON.parse(trimmed) as ReviewResult;
-  } catch {
-    throw new Error(`openrouter: model returned non-JSON output\n--- raw ---\n${raw}`);
-  }
-}
-
-function stripCodeFences(s: string): string {
-  const fenced = s.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
-  return fenced && fenced[1] !== undefined ? fenced[1].trim() : s;
+  return parseReviewResult(raw, 'openrouter');
 }
 
 export const openrouterProvider: Provider = {

@@ -3,6 +3,7 @@ import type { Provider, ReviewResult } from './types.js';
 import { buildReviewMessages } from '../prompts/reviewPrompt.js';
 import { buildVerifyMessages } from '../prompts/verifyPrompt.js';
 import { loadKeys } from '../utils/config.js';
+import { parseReviewResult } from './parse.js';
 
 function client() {
   const { openai } = loadKeys();
@@ -21,11 +22,7 @@ async function call(model: string, system: string, user: string): Promise<Review
     ]
   });
   const raw = res.choices[0]?.message?.content ?? '';
-  try {
-    return JSON.parse(raw) as ReviewResult;
-  } catch {
-    throw new Error(`openai: model returned non-JSON output\n--- raw ---\n${raw}`);
-  }
+  return parseReviewResult(raw, 'openai');
 }
 
 export const openaiProvider: Provider = {

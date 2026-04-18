@@ -3,6 +3,7 @@ import type { Provider, ReviewResult } from './types.js';
 import { buildReviewMessages } from '../prompts/reviewPrompt.js';
 import { buildVerifyMessages } from '../prompts/verifyPrompt.js';
 import { loadKeys } from '../utils/config.js';
+import { parseReviewResult } from './parse.js';
 
 function client() {
   const { anthropic } = loadKeys();
@@ -19,11 +20,7 @@ async function call(model: string, system: string, user: string): Promise<Review
   });
   const block = msg.content.find(b => b.type === 'text');
   const raw = block && block.type === 'text' ? block.text : '';
-  try {
-    return JSON.parse(raw) as ReviewResult;
-  } catch {
-    throw new Error(`anthropic: model returned non-JSON output\n--- raw ---\n${raw}`);
-  }
+  return parseReviewResult(raw, 'anthropic');
 }
 
 export const anthropicProvider: Provider = {

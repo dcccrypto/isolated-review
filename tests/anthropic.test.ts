@@ -85,11 +85,11 @@ describe('anthropicProvider', () => {
       .rejects.toThrow(/anthropic: model returned non-JSON output[\s\S]*Here is some prose/);
   });
 
-  it('handles responses with no text block as empty string', async () => {
+  it('throws a labeled empty-response error when no text block is present', async () => {
     mockCreate.mockResolvedValue({ content: [] });
 
     const { anthropicProvider } = await import('../src/providers/anthropic.js');
     await expect(anthropicProvider.review('claude-sonnet-4-5', input))
-      .rejects.toThrow(/non-JSON output/);
+      .rejects.toThrow(/anthropic: empty response from model/);
   });
 });

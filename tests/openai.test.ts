@@ -86,11 +86,11 @@ describe('openaiProvider', () => {
       .rejects.toThrow(/openai: model returned non-JSON output[\s\S]*not json/);
   });
 
-  it('handles missing content as empty string', async () => {
+  it('throws a labeled empty-response error when message.content is missing', async () => {
     mockCreate.mockResolvedValue({ choices: [{ message: {} }] });
 
     const { openaiProvider } = await import('../src/providers/openai.js');
     await expect(openaiProvider.review('gpt-4o', input))
-      .rejects.toThrow(/non-JSON output/);
+      .rejects.toThrow(/openai: empty response from model/);
   });
 });

@@ -10,7 +10,7 @@ const program = new Command();
 program
   .name('review')
   .description('Deep code review of a single file in isolation')
-  .version('0.2.0');
+  .version('0.2.1');
 
 function wrap(fn: () => Promise<string>) {
   return async () => {
