@@ -6,8 +6,18 @@ import type { ReviewResult } from '../src/providers/types.js';
 const result: ReviewResult = {
   summary: 'One paragraph gist.',
   findings: [
-    { title: 'Off-by-one', severity: 'critical', explanation: 'e' },
-    { title: 'Naming', severity: 'low', explanation: 'e' }
+    {
+      title: 'Off-by-one',
+      severity: 'critical',
+      location: { startLine: 42, endLine: 48 },
+      explanation: 'e'
+    },
+    {
+      title: 'Naming',
+      severity: 'low',
+      location: { startLine: 7 },
+      explanation: 'e'
+    }
   ]
 };
 
@@ -24,7 +34,7 @@ describe('renderPretty (plain theme for assertions)', () => {
 
   it('shows header with file and model', () => {
     const out = renderPretty({
-      filePath: 'src/a.ts',
+      filePath: '/tmp/proj/src/a.ts',
       primaryModel: 'claude-sonnet-4-5',
       primary: result,
       elapsedMs: 4200,
@@ -39,6 +49,36 @@ describe('renderPretty (plain theme for assertions)', () => {
     expect(out).toContain('Low  (1)');
     expect(out).not.toContain('Medium  (');
     expect(out).toContain('Reviewed in 4.2s');
+  });
+
+  it('renders location as basename:startLine-endLine under each finding', () => {
+    const out = renderPretty({
+      filePath: '/tmp/proj/src/a.ts',
+      primaryModel: 'claude',
+      primary: result,
+      elapsedMs: 1000,
+      theme,
+      includePatch: false
+    });
+    expect(out).toContain('a.ts:42-48');
+    expect(out).toContain('a.ts:7');
+    expect(out).not.toContain('a.ts:7-7');
+  });
+
+  it('omits the location line when a finding has no location', () => {
+    const noLoc: ReviewResult = {
+      summary: 's',
+      findings: [{ title: 'No loc', severity: 'medium', explanation: 'e' }]
+    };
+    const out = renderPretty({
+      filePath: '/tmp/proj/src/a.ts',
+      primaryModel: 'claude',
+      primary: noLoc,
+      elapsedMs: 1000,
+      theme,
+      includePatch: false
+    });
+    expect(out).not.toMatch(/a\.ts:\d/);
   });
 
   it('renders a verified block under a divider when provided', () => {

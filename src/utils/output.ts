@@ -1,5 +1,6 @@
 import type { ReviewResult, Finding, Severity } from '../providers/types.js';
 import type { Theme } from './theme.js';
+import { basename } from 'node:path';
 
 export function renderJson(result: ReviewResult): string {
   return JSON.stringify(result, null, 2);
@@ -27,7 +28,15 @@ function countBy(findings: Finding[]) {
   };
 }
 
-function renderFinding(f: Finding, t: Theme): string {
+function locationLabel(filePath: string, f: Finding): string | null {
+  if (!f.location) return null;
+  const name = basename(filePath);
+  const { startLine, endLine } = f.location;
+  const range = endLine && endLine !== startLine ? `${startLine}-${endLine}` : `${startLine}`;
+  return `${name}:${range}`;
+}
+
+function renderFinding(filePath: string, f: Finding, t: Theme): string {
   const symMap: Record<Severity, string> = {
     critical: t.sym.critical, medium: t.sym.medium, low: t.sym.low
   };
@@ -35,14 +44,16 @@ function renderFinding(f: Finding, t: Theme): string {
     critical: t.critical, medium: t.medium, low: t.low
   };
   const head = `  ${colorMap[f.severity](symMap[f.severity])} ${t.header(f.title)}`;
+  const loc = locationLabel(filePath, f);
+  const locLine = loc ? `\n     ${t.muted(loc)}` : '';
   const snip = f.snippet ? `\n     ${t.muted(f.snippet)}` : '';
   const body = `\n     ${f.explanation}`;
   const fix  = f.fix   ? `\n     ${t.dim('Fix — ')}${f.fix}` : '';
   const pch  = f.patch ? `\n     ${t.dim('Patch —')}\n${f.patch.split('\n').map(l => '       ' + l).join('\n')}` : '';
-  return head + snip + body + fix + pch;
+  return head + locLine + snip + body + fix + pch;
 }
 
-function renderBlock(result: ReviewResult, t: Theme): string {
+function renderBlock(filePath: string, result: ReviewResult, t: Theme): string {
   const lines: string[] = [];
   lines.push('');
   lines.push(` ${t.header(t.sym.caret + ' Summary')}`);
@@ -52,7 +63,7 @@ function renderBlock(result: ReviewResult, t: Theme): string {
     if (bucket.length === 0) continue;
     lines.push('');
     lines.push(` ${t.header(t.sym.caret + ' ' + LABEL[sev] + `  (${bucket.length})`)}`);
-    for (const f of bucket) lines.push(renderFinding(f, t));
+    for (const f of bucket) lines.push(renderFinding(filePath, f, t));
   }
   if (result.notes) {
     lines.push('');
@@ -75,10 +86,10 @@ export function renderPretty(args: RenderArgs): string {
   ].filter((l): l is string => l !== null);
   const header = headerLines.join('\n');
 
-  const body = renderBlock(primary, t);
+  const body = renderBlock(filePath, primary, t);
 
   const verifiedBlock = verified
-    ? `\n\n ${t.muted(t.rule())}\n ${t.accent('VERIFIED')}${renderBlock(verified, t)}`
+    ? `\n\n ${t.muted(t.rule())}\n ${t.accent('VERIFIED')}${renderBlock(filePath, verified, t)}`
     : '';
 
   const final = verified ?? primary;

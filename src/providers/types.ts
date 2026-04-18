@@ -1,8 +1,14 @@
 export type Severity = 'critical' | 'medium' | 'low';
 
+export interface Location {
+  startLine: number;
+  endLine?: number;
+}
+
 export interface Finding {
   title: string;
   severity: Severity;
+  location?: Location;
   snippet?: string;
   explanation: string;
   fix?: string;
