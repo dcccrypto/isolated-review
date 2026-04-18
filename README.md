@@ -9,7 +9,7 @@ Deep code review of a single file, in isolation, from the command line. The tool
 
 ```bash
 npm install -g isolated-review
-review keys        # one-time setup
+review init        # one-time setup: keys + default model
 review <file>
 ```
 
@@ -33,28 +33,37 @@ cd isolated-review
 pnpm install && pnpm build && pnpm link --global
 ```
 
-## API keys
+## Getting started
 
-You only need a key for whichever provider(s) you plan to use. There are three ways to set them, in resolution order:
+First-time setup is one command:
 
-1. **`review keys`** (recommended) — interactive prompt, saves to `~/.config/isolated-review/config.json` with `chmod 600`.
+```bash
+review init
+```
 
-   ```bash
-   review keys
-   ```
+It walks you through both API keys and your default model. After that, `review <file>` just works.
 
-   Existing values are masked in the preview (`sk-a…K9fF`). Leave a field blank to keep it, or type `-` to clear it.
+### Providers
 
-2. **Environment variables** — take precedence over the config file, useful in CI or one-shot sessions.
+You only need a key for whichever provider(s) you want to use.
 
-   ```bash
-   export ANTHROPIC_API_KEY=sk-ant-...
-   export OPENAI_API_KEY=sk-...
-   ```
+| Provider | Get a key | Covers |
+|---|---|---|
+| **OpenRouter** | [openrouter.ai/keys](https://openrouter.ai/keys) | Claude, GPT, Gemini, Grok, Llama, etc. — **one key for everything** |
+| Anthropic | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) | Claude (direct) |
+| OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | GPT + o-series (direct) |
 
-3. **Override the config location** — set `IR_CONFIG_DIR` to use a directory other than `~/.config/isolated-review`.
+OpenRouter is the simplest path if you just want to try different models without signing up everywhere.
 
-Missing keys produce a clean error pointing you at `review keys`, never a stack trace. Keys are never logged.
+### Where keys are stored
+
+Resolution order:
+
+1. **Environment variables** (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`) — take precedence, useful in CI.
+2. **Config file** `~/.config/isolated-review/config.json`, `chmod 600`, written by `review init` / `review keys`.
+3. Override the location with `IR_CONFIG_DIR` if you need to.
+
+Missing keys produce a clean error pointing you at `review keys`. Keys are never logged.
 
 ## Usage
 
@@ -70,8 +79,9 @@ review ./src/file.rs --patch
 | Command | Purpose |
 |---|---|
 | `review <file>` | Review a single file (the default command). |
-| `review keys` | Interactively set API keys (writes `~/.config/isolated-review/config.json`, `chmod 600`). |
-| `review settings` | Interactively set the default review model (same config file). |
+| `review init` | One-shot setup — keys + default model in one walk-through. |
+| `review keys` | Set API keys only. |
+| `review settings` | Set the default review model only. |
 
 ### Options
 
@@ -84,18 +94,39 @@ review ./src/file.rs --patch
 | `--json` | Emit machine-readable JSON (stable keys, no spinner, pipe into `jq`). |
 | `--plain` | Disable color and unicode formatting (ASCII only). |
 
-## Model aliases
+## Models
 
-You can pass any model name the underlying SDK accepts. These short aliases are also recognised:
+Pass anything recognised below to `--model` or set it as your default with `review settings`.
+
+### Aliases (shorter to type)
 
 | Alias | Resolves to | Provider |
 |---|---|---|
 | `claude`, `claude-sonnet` | `claude-sonnet-4-6` (latest Sonnet) | Anthropic |
 | `claude-opus` | `claude-opus-4-7` (latest Opus) | Anthropic |
 | `claude-haiku` | `claude-haiku-4-5-20251001` (latest Haiku) | Anthropic |
-| `claude-*` | passed through | Anthropic |
-| `gpt-*` | passed through | OpenAI |
-| `o1-*`, `o3-*`, `o4-*` | passed through | OpenAI |
+
+### Direct (pass-through to the named SDK)
+
+| Pattern | Example | Provider |
+|---|---|---|
+| `claude-*` | `claude-opus-4-7` | Anthropic |
+| `gpt-*` | `gpt-5`, `gpt-4o` | OpenAI |
+| `o1-*`, `o3-*`, `o4-*` | `o3-mini` | OpenAI |
+
+### OpenRouter (one key, every model)
+
+Use the `vendor/model` format (OpenRouter's own convention) — anything with a slash routes through OpenRouter automatically:
+
+```bash
+review src/foo.ts --model anthropic/claude-3.5-sonnet
+review src/foo.ts --model openai/gpt-4o
+review src/foo.ts --model google/gemini-pro-1.5
+review src/foo.ts --model x-ai/grok-2-1212
+review src/foo.ts --model meta-llama/llama-3.3-70b-instruct
+```
+
+Browse the full catalogue at [openrouter.ai/models](https://openrouter.ai/models). You can also write `openrouter:<id>` explicitly if you prefer.
 
 ## Choosing a model
 
