@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { runReview, type ReviewOpts } from './commands/review.js';
+import { runKeysSetup } from './commands/keys.js';
 
 const program = new Command();
 
@@ -8,6 +9,19 @@ program
   .name('review')
   .description('Deep code review of a single file in isolation')
   .version('0.1.0');
+
+program
+  .command('keys')
+  .description('Interactively set API keys (saved to ~/.config/isolated-review/config.json)')
+  .action(async () => {
+    try {
+      const output = await runKeysSetup();
+      process.stdout.write(output);
+    } catch (e) {
+      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+      process.exit(1);
+    }
+  });
 
 program
   .argument('<file>', 'path to the file to review')

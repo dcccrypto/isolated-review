@@ -17,23 +17,23 @@ const input: ReviewInput = {
 };
 
 describe('anthropicProvider', () => {
-  const origKey = process.env.ANTHROPIC_API_KEY;
+  const origEnv = { ...process.env };
 
   beforeEach(() => {
     mockCreate.mockReset();
     process.env.ANTHROPIC_API_KEY = 'test-key';
+    process.env.IR_CONFIG_DIR = '/nonexistent-for-test';
   });
 
   afterEach(() => {
-    if (origKey === undefined) delete process.env.ANTHROPIC_API_KEY;
-    else process.env.ANTHROPIC_API_KEY = origKey;
+    process.env = { ...origEnv };
   });
 
   it('throws a clean error when API key is missing', async () => {
     delete process.env.ANTHROPIC_API_KEY;
     const { anthropicProvider } = await import('../src/providers/anthropic.js');
     await expect(anthropicProvider.review('claude-sonnet-4-5', input))
-      .rejects.toThrow(/ANTHROPIC_API_KEY not set/);
+      .rejects.toThrow(/no Anthropic API key found/);
   });
 
   it('calls messages.create with system and user messages, parses JSON response', async () => {

@@ -2,10 +2,12 @@ import OpenAI from 'openai';
 import type { Provider, ReviewResult } from './types.js';
 import { buildReviewMessages } from '../prompts/reviewPrompt.js';
 import { buildVerifyMessages } from '../prompts/verifyPrompt.js';
+import { loadKeys } from '../utils/config.js';
 
 function client() {
-  if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not set');
-  return new OpenAI();
+  const { openai } = loadKeys();
+  if (!openai) throw new Error('no OpenAI API key found. set OPENAI_API_KEY or run `review keys`');
+  return new OpenAI({ apiKey: openai });
 }
 
 async function call(model: string, system: string, user: string): Promise<ReviewResult> {

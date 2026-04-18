@@ -2,10 +2,12 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { Provider, ReviewResult } from './types.js';
 import { buildReviewMessages } from '../prompts/reviewPrompt.js';
 import { buildVerifyMessages } from '../prompts/verifyPrompt.js';
+import { loadKeys } from '../utils/config.js';
 
 function client() {
-  if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not set');
-  return new Anthropic();
+  const { anthropic } = loadKeys();
+  if (!anthropic) throw new Error('no Anthropic API key found. set ANTHROPIC_API_KEY or run `review keys`');
+  return new Anthropic({ apiKey: anthropic });
 }
 
 async function call(model: string, system: string, user: string): Promise<ReviewResult> {

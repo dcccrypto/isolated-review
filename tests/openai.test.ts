@@ -17,23 +17,23 @@ const input: ReviewInput = {
 };
 
 describe('openaiProvider', () => {
-  const origKey = process.env.OPENAI_API_KEY;
+  const origEnv = { ...process.env };
 
   beforeEach(() => {
     mockCreate.mockReset();
     process.env.OPENAI_API_KEY = 'test-key';
+    process.env.IR_CONFIG_DIR = '/nonexistent-for-test';
   });
 
   afterEach(() => {
-    if (origKey === undefined) delete process.env.OPENAI_API_KEY;
-    else process.env.OPENAI_API_KEY = origKey;
+    process.env = { ...origEnv };
   });
 
   it('throws a clean error when API key is missing', async () => {
     delete process.env.OPENAI_API_KEY;
     const { openaiProvider } = await import('../src/providers/openai.js');
     await expect(openaiProvider.review('gpt-4o', input))
-      .rejects.toThrow(/OPENAI_API_KEY not set/);
+      .rejects.toThrow(/no OpenAI API key found/);
   });
 
   it('requests json_object response format and parses the content', async () => {
