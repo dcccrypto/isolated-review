@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { renderJson, renderPretty } from '../src/utils/output.js';
+import { renderJson, renderPretty, renderPlain } from '../src/utils/output.js';
 import { createTheme } from '../src/utils/theme.js';
 import type { ReviewResult } from '../src/providers/types.js';
+
+const ANSI_ESCAPES = /\x1b\[[0-9;]*m/;
 
 const result: ReviewResult = {
   summary: 'One paragraph gist.',
@@ -94,5 +96,22 @@ describe('renderPretty (plain theme for assertions)', () => {
     });
     expect(out).toContain('VERIFIED');
     expect(out).toContain('Refined.');
+  });
+});
+
+describe('renderPlain', () => {
+  it('produces output with NO ANSI color escapes, even if a colored theme is passed in', () => {
+    const richTheme = createTheme({ plain: false, forceRich: true });
+    const out = renderPlain({
+      filePath: '/tmp/proj/src/a.ts',
+      primaryModel: 'claude',
+      primary: result,
+      elapsedMs: 1000,
+      theme: richTheme,
+      includePatch: false
+    });
+    expect(ANSI_ESCAPES.test(out)).toBe(false);
+    expect(out).toContain('Critical  (1)');
+    expect(out).toContain('a.ts:42-48');
   });
 });

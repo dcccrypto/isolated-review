@@ -1,7 +1,25 @@
 import { createInterface, type Interface } from 'node:readline/promises';
-import { loadConfig, saveConfig, getConfigPath } from '../utils/config.js';
+import { loadConfig, loadKeys, saveConfig, getConfigPath } from '../utils/config.js';
 import { resolveModel, listAliases } from '../providers/resolve.js';
 import { createTheme, type Theme } from '../utils/theme.js';
+import type { Provider } from '../providers/types.js';
+
+const KEY_BY_PROVIDER: Record<Provider['name'], keyof ReturnType<typeof loadKeys>> = {
+  anthropic:  'anthropic',
+  openai:     'openai',
+  openrouter: 'openrouter'
+};
+
+export function warnIfKeyMissing(model: string, t: Theme): string | null {
+  try {
+    const { provider } = resolveModel(model);
+    const keys = loadKeys();
+    if (!keys[KEY_BY_PROVIDER[provider]]) {
+      return ` ${t.medium(t.sym.medium)} ${t.header('Warning')}: no ${provider} API key set. Run ${t.accent('review keys')} to add one before running a review.`;
+    }
+  } catch { /* invalid model will surface elsewhere */ }
+  return null;
+}
 
 export async function promptForDefaultModel(rl: Interface, t: Theme): Promise<string | null | undefined> {
   const current = loadConfig();
@@ -46,5 +64,13 @@ export async function runSettings(): Promise<string> {
   const { changed, after } = applyDefaultModel(choice);
   if (!changed) return `\n ${t.muted('No changes.')}\n`;
   const label = after ?? t.dim('(cleared)');
-  return `\n ${t.ok(t.sym.check)} Default model: ${t.accent(String(label))}\n   ${t.muted(`saved to ${getConfigPath()}`)}\n`;
+  const warn = after ? warnIfKeyMissing(after, t) : null;
+  const lines = [
+    '',
+    ` ${t.ok(t.sym.check)} Default model: ${t.accent(String(label))}`,
+    `   ${t.muted(`saved to ${getConfigPath()}`)}`
+  ];
+  if (warn) lines.push('', warn);
+  lines.push('');
+  return lines.join('\n');
 }

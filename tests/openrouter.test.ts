@@ -66,11 +66,12 @@ describe('openrouterProvider', () => {
     expect(mockCreate.mock.calls[0]![0].model).toBe('anthropic/claude-3.5-sonnet');
   });
 
-  it('does NOT send response_format (portability across OpenRouter models)', async () => {
+  it('does NOT send response_format (portability across OpenRouter models) but sets max_tokens', async () => {
     mockCreate.mockResolvedValue({ choices: [{ message: { content: '{"summary":"s","findings":[]}' } }] });
     const { openrouterProvider } = await import('../src/providers/openrouter.js');
     await openrouterProvider.review('openai/gpt-4o', input);
     expect(mockCreate.mock.calls[0]![0].response_format).toBeUndefined();
+    expect(mockCreate.mock.calls[0]![0].max_tokens).toBe(4096);
   });
 
   it('strips ```json code fences if a model returns them', async () => {

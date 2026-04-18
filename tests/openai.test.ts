@@ -53,6 +53,7 @@ describe('openaiProvider', () => {
     const args = mockCreate.mock.calls[0]![0];
     expect(args.model).toBe('gpt-4o');
     expect(args.response_format).toEqual({ type: 'json_object' });
+    expect(args.max_tokens).toBe(4096);
     expect(args.messages).toHaveLength(2);
     expect(args.messages[0].role).toBe('system');
     expect(args.messages[0].content).toContain('You are a deep code reviewer');

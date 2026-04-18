@@ -13,6 +13,7 @@ function client() {
 async function call(model: string, system: string, user: string): Promise<ReviewResult> {
   const res = await client().chat.completions.create({
     model,
+    max_tokens: 4096,
     response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: system },

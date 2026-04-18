@@ -1,5 +1,5 @@
 import type { ReviewResult, Finding, Severity } from '../providers/types.js';
-import type { Theme } from './theme.js';
+import { createTheme, type Theme } from './theme.js';
 import { basename } from 'node:path';
 
 export function renderJson(result: ReviewResult): string {
@@ -37,13 +37,9 @@ function locationLabel(filePath: string, f: Finding): string | null {
 }
 
 function renderFinding(filePath: string, f: Finding, t: Theme): string {
-  const symMap: Record<Severity, string> = {
-    critical: t.sym.critical, medium: t.sym.medium, low: t.sym.low
-  };
-  const colorMap: Record<Severity, (s: string) => string> = {
-    critical: t.critical, medium: t.medium, low: t.low
-  };
-  const head = `  ${colorMap[f.severity](symMap[f.severity])} ${t.header(f.title)}`;
+  const sym = t.sym[f.severity];
+  const color = t[f.severity];
+  const head = `  ${color(sym)} ${t.header(f.title)}`;
   const loc = locationLabel(filePath, f);
   const locLine = loc ? `\n     ${t.muted(loc)}` : '';
   const snip = f.snippet ? `\n     ${t.muted(f.snippet)}` : '';
@@ -101,5 +97,5 @@ export function renderPretty(args: RenderArgs): string {
 }
 
 export function renderPlain(args: RenderArgs): string {
-  return renderPretty({ ...args, theme: { ...args.theme, plain: true } });
+  return renderPretty({ ...args, theme: createTheme({ plain: true }) });
 }
