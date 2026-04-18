@@ -49,6 +49,7 @@ review ./src/file.rs --patch
 |---|---|
 | `review <file>` | Review a single file (the default command). |
 | `review keys` | Interactively set API keys (writes `~/.config/isolated-review/config.json`, `chmod 600`). |
+| `review settings` | Interactively set the default review model (same config file). |
 
 ### Options
 
@@ -67,11 +68,23 @@ You can pass any model name the underlying SDK accepts. These short aliases are 
 
 | Alias | Resolves to | Provider |
 |---|---|---|
-| `claude` | `claude-sonnet-4-5-20250929` | Anthropic |
-| `claude-opus` | `claude-opus-4-6` | Anthropic |
+| `claude`, `claude-sonnet` | `claude-sonnet-4-6` (latest Sonnet) | Anthropic |
+| `claude-opus` | `claude-opus-4-7` (latest Opus) | Anthropic |
+| `claude-haiku` | `claude-haiku-4-5-20251001` (latest Haiku) | Anthropic |
 | `claude-*` | passed through | Anthropic |
 | `gpt-*` | passed through | OpenAI |
 | `o1-*`, `o3-*`, `o4-*` | passed through | OpenAI |
+
+## Choosing a model
+
+`--model <name>` overrides for a single run. To set a persistent default:
+
+```bash
+review settings          # interactive; pick any alias or explicit model name
+review <file>            # now uses your default; no --model needed
+```
+
+Resolution order: `--model` flag → `defaultModel` from settings → `claude` (Sonnet).
 
 ## Output modes
 
