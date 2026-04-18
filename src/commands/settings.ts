@@ -34,6 +34,9 @@ export async function runSettings(): Promise<string> {
   if (newDefault === undefined) return `\n ${t.muted('No changes.')}\n`;
 
   if (newDefault !== null) {
+    if (/\s/.test(newDefault) || newDefault.startsWith('--')) {
+      throw new Error(`expected just a model name (e.g. "claude-opus" or "claude-opus-4-7"), got: ${newDefault}`);
+    }
     try { resolveModel(newDefault); }
     catch (e) {
       throw new Error(`${e instanceof Error ? e.message : String(e)}`);
