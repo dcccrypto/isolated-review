@@ -27,10 +27,22 @@ export interface ReviewInput {
   content: string;
   userNotes?: string;
   includePatch: boolean;
+  focusRanges?: Location[];
+}
+
+export interface Usage {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens?: number;
+}
+
+export interface ReviewResponse {
+  result: ReviewResult;
+  usage?: Usage;
 }
 
 export interface Provider {
   name: 'anthropic' | 'openai' | 'openrouter';
-  review(model: string, input: ReviewInput): Promise<ReviewResult>;
-  verify(model: string, input: ReviewInput, prior: ReviewResult): Promise<ReviewResult>;
+  review(model: string, input: ReviewInput): Promise<ReviewResponse>;
+  verify(model: string, input: ReviewInput, prior: ReviewResult): Promise<ReviewResponse>;
 }

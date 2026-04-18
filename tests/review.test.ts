@@ -2,12 +2,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ReviewResult } from '../src/providers/types.js';
+import type { ReviewResult, Usage } from '../src/providers/types.js';
 
-const anthropicReview = vi.fn();
-const anthropicVerify = vi.fn();
-const openaiReview    = vi.fn();
-const openaiVerify    = vi.fn();
+const anthropicReview   = vi.fn();
+const anthropicVerify   = vi.fn();
+const openaiReview      = vi.fn();
+const openaiVerify      = vi.fn();
+const openrouterReview  = vi.fn();
+const openrouterVerify  = vi.fn();
 
 vi.mock('../src/providers/anthropic.js', () => ({
   anthropicProvider: {
@@ -25,6 +27,14 @@ vi.mock('../src/providers/openai.js', () => ({
   }
 }));
 
+vi.mock('../src/providers/openrouter.js', () => ({
+  openrouterProvider: {
+    name: 'openrouter' as const,
+    review: openrouterReview,
+    verify: openrouterVerify
+  }
+}));
+
 const tmp = () => mkdtempSync(join(tmpdir(), 'ir-review-'));
 
 function makeFile(content = 'export const x = 1;\n', ext = 'ts') {
@@ -32,6 +42,10 @@ function makeFile(content = 'export const x = 1;\n', ext = 'ts') {
   const p = join(d, `file.${ext}`);
   writeFileSync(p, content);
   return { dir: d, path: p };
+}
+
+function resp(result: ReviewResult, usage?: Usage) {
+  return { result, usage };
 }
 
 describe('runReview', () => {
@@ -42,6 +56,8 @@ describe('runReview', () => {
     anthropicVerify.mockReset();
     openaiReview.mockReset();
     openaiVerify.mockReset();
+    openrouterReview.mockReset();
+    openrouterVerify.mockReset();
     process.env.IR_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'ir-review-cfg-'));
   });
 
@@ -55,7 +71,7 @@ describe('runReview', () => {
       summary: 'Looks good.',
       findings: [{ title: 'Off-by-one', severity: 'critical', explanation: 'e' }]
     };
-    anthropicReview.mockResolvedValue(payload);
+    anthropicReview.mockResolvedValue(resp(payload));
 
     const { runReview } = await import('../src/commands/review.js');
     const file = makeFile();
@@ -73,8 +89,7 @@ describe('runReview', () => {
   });
 
   it('routes gpt-* to the OpenAI provider', async () => {
-    const payload: ReviewResult = { summary: 's', findings: [] };
-    openaiReview.mockResolvedValue(payload);
+    openaiReview.mockResolvedValue(resp({ summary: 's', findings: [] }));
 
     const { runReview } = await import('../src/commands/review.js');
     const file = makeFile();
@@ -87,14 +102,28 @@ describe('runReview', () => {
     rmSync(file.dir, { recursive: true });
   });
 
+  it('routes vendor/model to OpenRouter provider', async () => {
+    openrouterReview.mockResolvedValue(resp({ summary: 's', findings: [] }));
+
+    const { runReview } = await import('../src/commands/review.js');
+    const file = makeFile();
+    await runReview(file.path, {
+      model: 'anthropic/claude-3.5-sonnet', patch: false, json: true, plain: false
+    });
+
+    expect(openrouterReview).toHaveBeenCalledTimes(1);
+    expect(openrouterReview.mock.calls[0]![0]).toBe('anthropic/claude-3.5-sonnet');
+    rmSync(file.dir, { recursive: true });
+  });
+
   it('runs a verifier pass and returns the refined result in the pretty output', async () => {
     const primary: ReviewResult = {
       summary: 'First pass.',
       findings: [{ title: 'Weak', severity: 'low', explanation: 'maybe' }]
     };
     const refined: ReviewResult = { summary: 'Refined pass.', findings: [] };
-    openaiReview.mockResolvedValue(primary);
-    anthropicVerify.mockResolvedValue(refined);
+    openaiReview.mockResolvedValue(resp(primary));
+    anthropicVerify.mockResolvedValue(resp(refined));
 
     const { runReview } = await import('../src/commands/review.js');
     const file = makeFile();
@@ -104,11 +133,9 @@ describe('runReview', () => {
 
     expect(openaiReview).toHaveBeenCalledTimes(1);
     expect(anthropicVerify).toHaveBeenCalledTimes(1);
-    // verifier gets both the input and the prior result
     expect(anthropicVerify.mock.calls[0]![2]).toEqual(primary);
     expect(out).toContain('VERIFIED');
     expect(out).toContain('Refined pass.');
-    // footer counts use the verified (final) result, which has zero findings
     expect(out).toContain('0 critical · 0 medium · 0 low');
     rmSync(file.dir, { recursive: true });
   });
@@ -116,8 +143,8 @@ describe('runReview', () => {
   it('emits stable JSON for --json and returns verified result when verifier ran', async () => {
     const primary: ReviewResult = { summary: 'p', findings: [] };
     const refined: ReviewResult = { summary: 'r', findings: [] };
-    anthropicReview.mockResolvedValue(primary);
-    openaiVerify.mockResolvedValue(refined);
+    anthropicReview.mockResolvedValue(resp(primary));
+    openaiVerify.mockResolvedValue(resp(refined));
 
     const { runReview } = await import('../src/commands/review.js');
     const file = makeFile();
@@ -131,7 +158,7 @@ describe('runReview', () => {
   });
 
   it('passes userNotes and includePatch through to the provider input', async () => {
-    openaiReview.mockResolvedValue({ summary: 's', findings: [] });
+    openaiReview.mockResolvedValue(resp({ summary: 's', findings: [] }));
 
     const { runReview } = await import('../src/commands/review.js');
     const file = makeFile();
@@ -177,8 +204,7 @@ describe('runReview', () => {
     const { saveConfig } = await import('../src/utils/config.js');
     saveConfig({ defaultModel: 'claude-opus' });
 
-    const payload: ReviewResult = { summary: 's', findings: [] };
-    anthropicReview.mockResolvedValue(payload);
+    anthropicReview.mockResolvedValue(resp({ summary: 's', findings: [] }));
 
     const { runReview } = await import('../src/commands/review.js');
     const file = makeFile();
@@ -189,8 +215,7 @@ describe('runReview', () => {
   });
 
   it('falls back to "claude" when neither --model nor defaultModel are set', async () => {
-    const payload: ReviewResult = { summary: 's', findings: [] };
-    anthropicReview.mockResolvedValue(payload);
+    anthropicReview.mockResolvedValue(resp({ summary: 's', findings: [] }));
 
     const { runReview } = await import('../src/commands/review.js');
     const file = makeFile();
@@ -204,8 +229,7 @@ describe('runReview', () => {
     const { saveConfig } = await import('../src/utils/config.js');
     saveConfig({ defaultModel: 'claude-opus' });
 
-    const payload: ReviewResult = { summary: 's', findings: [] };
-    openaiReview.mockResolvedValue(payload);
+    openaiReview.mockResolvedValue(resp({ summary: 's', findings: [] }));
 
     const { runReview } = await import('../src/commands/review.js');
     const file = makeFile();
@@ -215,6 +239,24 @@ describe('runReview', () => {
 
     expect(openaiReview.mock.calls[0]![0]).toBe('gpt-4o');
     expect(anthropicReview).not.toHaveBeenCalled();
+    rmSync(file.dir, { recursive: true });
+  });
+
+  it('passes usage through to the pretty footer (tokens + cost)', async () => {
+    const payload: ReviewResult = { summary: 's', findings: [] };
+    const usage: Usage = { inputTokens: 2847, outputTokens: 893, cachedInputTokens: 1200 };
+    anthropicReview.mockResolvedValue(resp(payload, usage));
+
+    const { runReview } = await import('../src/commands/review.js');
+    const file = makeFile();
+    const out = await runReview(file.path, {
+      model: 'claude-opus', patch: false, json: false, plain: true
+    });
+
+    expect(out).toMatch(/2\.8k in/);
+    expect(out).toMatch(/1\.2k cached/);
+    expect(out).toMatch(/893 out/);
+    expect(out).toMatch(/\$/);
     rmSync(file.dir, { recursive: true });
   });
 });

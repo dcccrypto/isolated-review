@@ -1,6 +1,7 @@
-import type { ReviewResult, Finding, Severity } from '../providers/types.js';
+import type { ReviewResult, Finding, Severity, Usage } from '../providers/types.js';
 import { createTheme, type Theme } from './theme.js';
 import { basename } from 'node:path';
+import { estimateCost, formatTokens, formatUsd } from './pricing.js';
 
 export function renderJson(result: ReviewResult): string {
   return JSON.stringify(result, null, 2);
@@ -14,7 +15,10 @@ export interface RenderArgs {
   verified?: ReviewResult;
   elapsedMs: number;
   includePatch: boolean;
+  diffBase?: string;
   theme: Theme;
+  primaryUsage?: Usage;
+  verifierUsage?: Usage;
 }
 
 const ORDER: Severity[] = ['critical', 'medium', 'low'];
@@ -73,12 +77,15 @@ export function renderPretty(args: RenderArgs): string {
   const title = ` ${t.header('review')}  ${t.accent(filePath)}`;
   const topRule = ' ' + t.muted(t.rule());
   const kv = (k: string, v: string) => ` ${t.muted(k.padEnd(9))}${v}`;
+  const modes: string[] = [];
+  if (includePatch)      modes.push('patch');
+  if (args.diffBase)     modes.push(`diff vs ${args.diffBase}`);
   const headerLines = [
     title,
     topRule,
     kv('Model', primaryModel),
     verifierModel ? kv('Verifier', verifierModel) : null,
-    includePatch ? kv('Mode', 'patch') : null
+    modes.length ? kv('Mode', modes.join(', ')) : null
   ].filter((l): l is string => l !== null);
   const header = headerLines.join('\n');
 
@@ -91,9 +98,31 @@ export function renderPretty(args: RenderArgs): string {
   const final = verified ?? primary;
   const counts = countBy(final.findings);
   const secs = (elapsedMs / 1000).toFixed(1);
-  const footer = `\n\n ${t.muted(t.rule())}\n ${t.ok(t.sym.check)} Reviewed in ${secs}s · ${counts.critical} critical · ${counts.medium} medium · ${counts.low} low\n`;
+  const usageLine = renderUsage(args, t);
+  const footer = `\n\n ${t.muted(t.rule())}\n ${t.ok(t.sym.check)} Reviewed in ${secs}s · ${counts.critical} critical · ${counts.medium} medium · ${counts.low} low${usageLine}\n`;
 
   return header + body + verifiedBlock + footer;
+}
+
+function renderUsage(args: RenderArgs, t: Theme): string {
+  const parts: string[] = [];
+  if (args.primaryUsage) {
+    parts.push(formatUsageLine('', args.primaryModel, args.primaryUsage));
+  }
+  if (args.verifierUsage && args.verifierModel) {
+    parts.push(formatUsageLine('verifier ', args.verifierModel, args.verifierUsage));
+  }
+  if (!parts.length) return '';
+  return '\n   ' + t.muted(parts.join('  ·  '));
+}
+
+function formatUsageLine(label: string, model: string, usage: Usage): string {
+  const cached = usage.cachedInputTokens ?? 0;
+  const cachedStr = cached > 0 ? ` (${formatTokens(cached)} cached)` : '';
+  const tokens = `${formatTokens(usage.inputTokens)} in${cachedStr} / ${formatTokens(usage.outputTokens)} out`;
+  const cost = estimateCost(model, usage);
+  const costStr = cost !== null ? ` · ~${formatUsd(cost)}` : '';
+  return `${label}${tokens}${costStr}`;
 }
 
 export function renderPlain(args: RenderArgs): string {

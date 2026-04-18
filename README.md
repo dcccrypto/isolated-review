@@ -87,12 +87,34 @@ review ./src/file.rs --patch
 
 | Option | Description |
 |---|---|
-| `--model <name>` | Primary review model. Default: `claude`. |
+| `--model <name>` | Primary review model. Default: `claude` (or your `review settings` default). |
 | `--verify <name>` | Optional second-pass verifier model. |
 | `--notes "<text>"` | Extra context the reviewer should consider. |
 | `--patch` | Ask the reviewer to include suggested patches (unified diff). |
+| `--diff [base]` | Review only lines changed vs a git base (default: `HEAD`). Great for PR workflows. |
 | `--json` | Emit machine-readable JSON (stable keys, no spinner, pipe into `jq`). |
 | `--plain` | Disable color and unicode formatting (ASCII only). |
+
+### Review only what changed
+
+```bash
+review src/file.ts --diff              # vs HEAD (unstaged + staged)
+review src/file.ts --diff main         # vs the main branch
+review src/file.ts --diff HEAD~1       # vs your previous commit
+```
+
+The tool sends the full file for context, but tells the reviewer to only report findings on the changed lines. Use this on every PR.
+
+### Tokens and cost in the footer
+
+Every pretty-mode review ends with a token + cost line, e.g.:
+
+```
+ ✓ Reviewed in 4.2s · 2 critical · 1 medium · 0 low
+   2.8k in (1.2k cached) / 893 out · ~$0.104
+```
+
+Cost is estimated against a built-in price table for the latest Claude 4.x tier and common OpenAI models. Unknown models show tokens only, no `$`. Anthropic prompt caching (enabled automatically) makes the `cached` portion ~10× cheaper than fresh input tokens.
 
 ## Models
 

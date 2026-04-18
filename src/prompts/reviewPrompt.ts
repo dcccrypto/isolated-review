@@ -1,5 +1,6 @@
 import type { ReviewInput } from '../providers/types.js';
 import { SCHEMA_INSTRUCTION, withLineNumbers } from './shared.js';
+import { formatRanges } from '../utils/diff.js';
 
 const LOCATION_NOTE = `Every finding MUST include \`location\` with the line range it refers to (1-based, inclusive). The file you are given has line numbers prepended in the form "  42 | <code>" — read them as the canonical line numbers. \`snippet\` should quote the exact tokens you are referring to, copied verbatim from the file.`;
 
@@ -23,7 +24,10 @@ export function buildReviewMessages(input: ReviewInput) {
   const patch = input.includePatch
     ? `\n\nFor each actionable finding, include a unified-diff \`patch\` field when a concrete fix is possible.`
     : '';
+  const focus = input.focusRanges && input.focusRanges.length
+    ? `\n\n## Only review changed lines\nOnly include findings that touch these line ranges: ${formatRanges(input.focusRanges)}. Skip findings on unchanged code, even if they would otherwise be valid. Use the full file below for context, but the report must only cover these ranges.`
+    : '';
   const numbered = withLineNumbers(input.content);
-  const user = `## File: ${input.filePath}\nLanguage: ${input.language}${notes}${patch}\n\n\`\`\`${input.language}\n${numbered}\n\`\`\``;
+  const user = `## File: ${input.filePath}\nLanguage: ${input.language}${notes}${patch}${focus}\n\n\`\`\`${input.language}\n${numbered}\n\`\`\``;
   return { system: REVIEW_SYSTEM, user };
 }

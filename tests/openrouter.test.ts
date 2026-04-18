@@ -58,11 +58,15 @@ describe('openrouterProvider', () => {
       summary: 's',
       findings: [{ title: 't', severity: 'medium', explanation: 'e' }]
     };
-    mockCreate.mockResolvedValue({ choices: [{ message: { content: JSON.stringify(payload) } }] });
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify(payload) } }],
+      usage: { prompt_tokens: 80, completion_tokens: 40 }
+    });
 
     const { openrouterProvider } = await import('../src/providers/openrouter.js');
-    const result = await openrouterProvider.review('anthropic/claude-3.5-sonnet', input);
+    const { result, usage } = await openrouterProvider.review('anthropic/claude-3.5-sonnet', input);
     expect(result).toEqual(payload);
+    expect(usage).toEqual({ inputTokens: 80, outputTokens: 40, cachedInputTokens: undefined });
     expect(mockCreate.mock.calls[0]![0].model).toBe('anthropic/claude-3.5-sonnet');
   });
 
@@ -79,8 +83,8 @@ describe('openrouterProvider', () => {
       choices: [{ message: { content: '```json\n{"summary":"fenced","findings":[]}\n```' } }]
     });
     const { openrouterProvider } = await import('../src/providers/openrouter.js');
-    const r = await openrouterProvider.review('openai/gpt-4o', input);
-    expect(r.summary).toBe('fenced');
+    const { result } = await openrouterProvider.review('openai/gpt-4o', input);
+    expect(result.summary).toBe('fenced');
   });
 
   it('throws descriptive error for non-JSON output', async () => {

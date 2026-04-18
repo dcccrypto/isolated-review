@@ -42,13 +42,15 @@ describe('anthropicProvider', () => {
       findings: [{ title: 't', severity: 'low', explanation: 'e' }]
     };
     mockCreate.mockResolvedValue({
-      content: [{ type: 'text', text: JSON.stringify(payload) }]
+      content: [{ type: 'text', text: JSON.stringify(payload) }],
+      usage: { input_tokens: 100, output_tokens: 50 }
     });
 
     const { anthropicProvider } = await import('../src/providers/anthropic.js');
-    const result = await anthropicProvider.review('claude-sonnet-4-5', input);
+    const { result, usage } = await anthropicProvider.review('claude-sonnet-4-5', input);
 
     expect(result).toEqual(payload);
+    expect(usage).toEqual({ inputTokens: 100, outputTokens: 50, cachedInputTokens: undefined });
     expect(mockCreate).toHaveBeenCalledTimes(1);
     const args = mockCreate.mock.calls[0]![0];
     expect(args.model).toBe('claude-sonnet-4-5');
@@ -65,13 +67,16 @@ describe('anthropicProvider', () => {
   it('verify() uses the verifier prompt and includes the prior review', async () => {
     const prior: ReviewResult = { summary: 'p', findings: [] };
     mockCreate.mockResolvedValue({
-      content: [{ type: 'text', text: '{"summary":"v","findings":[]}' }]
+      content: [{ type: 'text', text: '{"summary":"v","findings":[]}' }],
+      usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 800 }
     });
 
     const { anthropicProvider } = await import('../src/providers/anthropic.js');
-    const result = await anthropicProvider.verify('claude-opus-4-6', input, prior);
+    const { result, usage } = await anthropicProvider.verify('claude-opus-4-6', input, prior);
 
     expect(result.summary).toBe('v');
+    expect(usage?.cachedInputTokens).toBe(800);
+    expect(usage?.inputTokens).toBe(810);
     const args = mockCreate.mock.calls[0]![0];
     expect(args.system[0].text).toContain('You are validating and refining a prior code review');
     expect(args.system[0].cache_control).toEqual({ type: 'ephemeral' });

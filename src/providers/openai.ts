@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { Provider, ReviewResult } from './types.js';
+import type { Provider, ReviewResponse, Usage } from './types.js';
 import { buildReviewMessages } from '../prompts/reviewPrompt.js';
 import { buildVerifyMessages } from '../prompts/verifyPrompt.js';
 import { loadKeys } from '../utils/config.js';
@@ -11,7 +11,17 @@ function client() {
   return new OpenAI({ apiKey: openai });
 }
 
-async function call(model: string, system: string, user: string): Promise<ReviewResult> {
+function extractUsage(res: OpenAI.Chat.Completions.ChatCompletion): Usage | undefined {
+  const u = res.usage;
+  if (!u) return undefined;
+  return {
+    inputTokens: u.prompt_tokens,
+    outputTokens: u.completion_tokens,
+    cachedInputTokens: u.prompt_tokens_details?.cached_tokens ?? undefined
+  };
+}
+
+async function call(model: string, system: string, user: string): Promise<ReviewResponse> {
   const res = await client().chat.completions.create({
     model,
     max_tokens: 4096,
@@ -22,7 +32,7 @@ async function call(model: string, system: string, user: string): Promise<Review
     ]
   });
   const raw = res.choices[0]?.message?.content ?? '';
-  return parseReviewResult(raw, 'openai');
+  return { result: parseReviewResult(raw, 'openai'), usage: extractUsage(res) };
 }
 
 export const openaiProvider: Provider = {

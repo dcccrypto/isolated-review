@@ -42,13 +42,15 @@ describe('openaiProvider', () => {
       findings: [{ title: 't', severity: 'medium', explanation: 'e' }]
     };
     mockCreate.mockResolvedValue({
-      choices: [{ message: { content: JSON.stringify(payload) } }]
+      choices: [{ message: { content: JSON.stringify(payload) } }],
+      usage: { prompt_tokens: 100, completion_tokens: 50, prompt_tokens_details: { cached_tokens: 80 } }
     });
 
     const { openaiProvider } = await import('../src/providers/openai.js');
-    const result = await openaiProvider.review('gpt-4o', input);
+    const { result, usage } = await openaiProvider.review('gpt-4o', input);
 
     expect(result).toEqual(payload);
+    expect(usage).toEqual({ inputTokens: 100, outputTokens: 50, cachedInputTokens: 80 });
     expect(mockCreate).toHaveBeenCalledTimes(1);
     const args = mockCreate.mock.calls[0]![0];
     expect(args.model).toBe('gpt-4o');
@@ -64,11 +66,12 @@ describe('openaiProvider', () => {
   it('verify() routes through the verifier prompt', async () => {
     const prior: ReviewResult = { summary: 'p', findings: [] };
     mockCreate.mockResolvedValue({
-      choices: [{ message: { content: '{"summary":"refined","findings":[]}' } }]
+      choices: [{ message: { content: '{"summary":"refined","findings":[]}' } }],
+      usage: { prompt_tokens: 50, completion_tokens: 25 }
     });
 
     const { openaiProvider } = await import('../src/providers/openai.js');
-    const result = await openaiProvider.verify('gpt-4o', input, prior);
+    const { result } = await openaiProvider.verify('gpt-4o', input, prior);
 
     expect(result.summary).toBe('refined');
     const args = mockCreate.mock.calls[0]![0];
