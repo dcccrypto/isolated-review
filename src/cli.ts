@@ -3,39 +3,40 @@ import { Command } from 'commander';
 import { runReview, type ReviewOpts } from './commands/review.js';
 import { runKeysSetup } from './commands/keys.js';
 import { runSettings } from './commands/settings.js';
+import { runInit } from './commands/init.js';
 
 const program = new Command();
 
 program
   .name('review')
   .description('Deep code review of a single file in isolation')
-  .version('0.1.0');
+  .version('0.2.0');
+
+function wrap(fn: () => Promise<string>) {
+  return async () => {
+    try {
+      process.stdout.write(await fn());
+    } catch (e) {
+      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+      process.exit(1);
+    }
+  };
+}
+
+program
+  .command('init')
+  .description('One-shot setup: API keys + default model')
+  .action(wrap(runInit));
 
 program
   .command('keys')
-  .description('Interactively set API keys (saved to ~/.config/isolated-review/config.json)')
-  .action(async () => {
-    try {
-      const output = await runKeysSetup();
-      process.stdout.write(output);
-    } catch (e) {
-      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
-      process.exit(1);
-    }
-  });
+  .description('Set API keys (Anthropic, OpenAI, OpenRouter)')
+  .action(wrap(runKeysSetup));
 
 program
   .command('settings')
-  .description('Interactively set the default review model')
-  .action(async () => {
-    try {
-      const output = await runSettings();
-      process.stdout.write(output);
-    } catch (e) {
-      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
-      process.exit(1);
-    }
-  });
+  .description('Set the default review model')
+  .action(wrap(runSettings));
 
 program
   .argument('<file>', 'path to the file to review')

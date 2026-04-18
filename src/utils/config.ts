@@ -5,10 +5,11 @@ import { join } from 'node:path';
 export interface Config {
   anthropic?: string;
   openai?: string;
+  openrouter?: string;
   defaultModel?: string;
 }
 
-export type Keys = Pick<Config, 'anthropic' | 'openai'>;
+export type Keys = Pick<Config, 'anthropic' | 'openai' | 'openrouter'>;
 
 export function getConfigDir(): string {
   return process.env.IR_CONFIG_DIR ?? join(homedir(), '.config', 'isolated-review');
@@ -26,6 +27,7 @@ function readConfigFile(): Config {
     const clean: Config = {};
     if (typeof parsed.anthropic    === 'string') clean.anthropic    = parsed.anthropic;
     if (typeof parsed.openai       === 'string') clean.openai       = parsed.openai;
+    if (typeof parsed.openrouter   === 'string') clean.openrouter   = parsed.openrouter;
     if (typeof parsed.defaultModel === 'string') clean.defaultModel = parsed.defaultModel;
     return clean;
   } catch {
@@ -36,15 +38,16 @@ function readConfigFile(): Config {
 export function loadConfig(): Config {
   const file = readConfigFile();
   return {
-    anthropic:    process.env.ANTHROPIC_API_KEY || file.anthropic,
-    openai:       process.env.OPENAI_API_KEY    || file.openai,
+    anthropic:    process.env.ANTHROPIC_API_KEY  || file.anthropic,
+    openai:       process.env.OPENAI_API_KEY     || file.openai,
+    openrouter:   process.env.OPENROUTER_API_KEY || file.openrouter,
     defaultModel: file.defaultModel
   };
 }
 
 export function loadKeys(): Keys {
   const c = loadConfig();
-  return { anthropic: c.anthropic, openai: c.openai };
+  return { anthropic: c.anthropic, openai: c.openai, openrouter: c.openrouter };
 }
 
 export function saveConfig(patch: Partial<Config>): void {

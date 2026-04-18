@@ -3,14 +3,16 @@ import { readSourceFile } from '../utils/readFile.js';
 import { resolveModel } from '../providers/resolve.js';
 import { anthropicProvider } from '../providers/anthropic.js';
 import { openaiProvider } from '../providers/openai.js';
+import { openrouterProvider } from '../providers/openrouter.js';
 import { createTheme } from '../utils/theme.js';
 import { renderJson, renderPretty } from '../utils/output.js';
 import { loadConfig } from '../utils/config.js';
 import type { Provider, ReviewInput, ReviewResult } from '../providers/types.js';
 
 const providers: Record<Provider['name'], Provider> = {
-  anthropic: anthropicProvider,
-  openai:    openaiProvider
+  anthropic:  anthropicProvider,
+  openai:     openaiProvider,
+  openrouter: openrouterProvider
 };
 
 export interface ReviewOpts {

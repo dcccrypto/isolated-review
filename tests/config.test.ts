@@ -13,6 +13,7 @@ describe('config', () => {
     process.env.IR_CONFIG_DIR = dir;
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
   });
 
   afterEach(() => {
@@ -22,7 +23,7 @@ describe('config', () => {
 
   it('loadConfig returns empty when no file and no env', () => {
     expect(loadConfig()).toEqual({
-      anthropic: undefined, openai: undefined, defaultModel: undefined
+      anthropic: undefined, openai: undefined, openrouter: undefined, defaultModel: undefined
     });
   });
 
@@ -77,7 +78,14 @@ describe('config', () => {
   it('loadConfig tolerates a corrupt config file', () => {
     writeFileSync(getConfigPath(), 'not json');
     expect(loadConfig()).toEqual({
-      anthropic: undefined, openai: undefined, defaultModel: undefined
+      anthropic: undefined, openai: undefined, openrouter: undefined, defaultModel: undefined
     });
+  });
+
+  it('loads OpenRouter key from env and config', () => {
+    saveConfig({ openrouter: 'or-stored' });
+    expect(loadConfig().openrouter).toBe('or-stored');
+    process.env.OPENROUTER_API_KEY = 'or-env';
+    expect(loadConfig().openrouter).toBe('or-env');
   });
 });

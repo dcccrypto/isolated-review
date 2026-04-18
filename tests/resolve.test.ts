@@ -34,6 +34,24 @@ describe('resolveModel', () => {
   it('throws on unknown', () => {
     expect(() => resolveModel('mistral')).toThrow(/unknown model/);
   });
+
+  it('routes vendor/model format to OpenRouter', () => {
+    expect(resolveModel('anthropic/claude-3.5-sonnet'))
+      .toEqual({ provider: 'openrouter', model: 'anthropic/claude-3.5-sonnet' });
+    expect(resolveModel('openai/gpt-4o'))
+      .toEqual({ provider: 'openrouter', model: 'openai/gpt-4o' });
+    expect(resolveModel('google/gemini-pro-1.5'))
+      .toEqual({ provider: 'openrouter', model: 'google/gemini-pro-1.5' });
+  });
+
+  it('routes "openrouter:" prefix to OpenRouter, stripping the prefix', () => {
+    expect(resolveModel('openrouter:x-ai/grok-2-1212'))
+      .toEqual({ provider: 'openrouter', model: 'x-ai/grok-2-1212' });
+  });
+
+  it('rejects empty OpenRouter model id', () => {
+    expect(() => resolveModel('openrouter:')).toThrow(/empty OpenRouter model id/);
+  });
 });
 
 describe('listAliases', () => {

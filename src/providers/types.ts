@@ -30,7 +30,7 @@ export interface ReviewInput {
 }
 
 export interface Provider {
-  name: 'anthropic' | 'openai';
+  name: 'anthropic' | 'openai' | 'openrouter';
   review(model: string, input: ReviewInput): Promise<ReviewResult>;
   verify(model: string, input: ReviewInput, prior: ReviewResult): Promise<ReviewResult>;
 }
