@@ -21,67 +21,60 @@ export interface ReviewOpts {
   plain: boolean;
 }
 
-export async function runReview(filePath: string, opts: ReviewOpts) {
+export async function runReview(filePath: string, opts: ReviewOpts): Promise<string> {
+  const file = await readSourceFile(filePath);
+  const primary = resolveModel(opts.model);
+  const provider = providers[primary.provider];
+  const input: ReviewInput = {
+    filePath: file.absolutePath,
+    language: file.language,
+    content: file.content,
+    userNotes: opts.notes,
+    includePatch: opts.patch
+  };
+
+  const started = Date.now();
+  const silent = opts.json || !process.stdout.isTTY;
+
+  const s1 = silent ? null : ora(`Reviewing with ${primary.model}…`).start();
+  let primaryResult: ReviewResult;
   try {
-    const file = await readSourceFile(filePath);
-    const primary = resolveModel(opts.model);
-    const provider = providers[primary.provider];
-    const input: ReviewInput = {
-      filePath: file.absolutePath,
-      language: file.language,
-      content: file.content,
-      userNotes: opts.notes,
-      includePatch: opts.patch
-    };
+    primaryResult = await provider.review(primary.model, input);
+    s1?.succeed(`Reviewed with ${primary.model}`);
+  } catch (e) {
+    s1?.fail('Review failed');
+    throw e;
+  }
 
-    const started = Date.now();
-    const silent = opts.json || !process.stdout.isTTY;
-
-    const s1 = silent ? null : ora(`Reviewing with ${primary.model}…`).start();
-    let primaryResult: ReviewResult;
+  let verifiedResult: ReviewResult | undefined;
+  let verifierModelName: string | undefined;
+  if (opts.verify) {
+    const verifier = resolveModel(opts.verify);
+    verifierModelName = verifier.model;
+    const vprov = providers[verifier.provider];
+    const s2 = silent ? null : ora(`Verifying with ${verifier.model}…`).start();
     try {
-      primaryResult = await provider.review(primary.model, input);
-      s1?.succeed(`Reviewed with ${primary.model}`);
+      verifiedResult = await vprov.verify(verifier.model, input, primaryResult);
+      s2?.succeed(`Verified with ${verifier.model}`);
     } catch (e) {
-      s1?.fail('Review failed');
+      s2?.fail('Verify failed');
       throw e;
     }
-
-    let verifiedResult: ReviewResult | undefined;
-    let verifierModelName: string | undefined;
-    if (opts.verify) {
-      const verifier = resolveModel(opts.verify);
-      verifierModelName = verifier.model;
-      const vprov = providers[verifier.provider];
-      const s2 = silent ? null : ora(`Verifying with ${verifier.model}…`).start();
-      try {
-        verifiedResult = await vprov.verify(verifier.model, input, primaryResult);
-        s2?.succeed(`Verified with ${verifier.model}`);
-      } catch (e) {
-        s2?.fail('Verify failed');
-        throw e;
-      }
-    }
-
-    if (opts.json) {
-      console.log(renderJson(verifiedResult ?? primaryResult));
-      return;
-    }
-
-    const theme = createTheme({ plain: opts.plain });
-    const out = renderPretty({
-      filePath: file.absolutePath,
-      primaryModel: primary.model,
-      verifierModel: verifierModelName,
-      primary: primaryResult,
-      verified: verifiedResult,
-      elapsedMs: Date.now() - started,
-      includePatch: opts.patch,
-      theme
-    });
-    console.log(out);
-  } catch (e) {
-    console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
-    process.exit(1);
   }
+
+  if (opts.json) {
+    return renderJson(verifiedResult ?? primaryResult);
+  }
+
+  const theme = createTheme({ plain: opts.plain });
+  return renderPretty({
+    filePath: file.absolutePath,
+    primaryModel: primary.model,
+    verifierModel: verifierModelName,
+    primary: primaryResult,
+    verified: verifiedResult,
+    elapsedMs: Date.now() - started,
+    includePatch: opts.patch,
+    theme
+  });
 }

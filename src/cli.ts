@@ -18,7 +18,13 @@ program
   .option('--json',          'emit machine-readable JSON', false)
   .option('--plain',         'disable color and unicode formatting', false)
   .action(async (file: string, opts: ReviewOpts) => {
-    await runReview(file, opts);
+    try {
+      const output = await runReview(file, opts);
+      console.log(output);
+    } catch (e) {
+      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+      process.exit(1);
+    }
   });
 
 program.parseAsync();
