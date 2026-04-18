@@ -68,8 +68,8 @@ Missing keys produce a clean error pointing you at `review keys`. Keys are never
 ## Usage
 
 ```bash
-review ./src/file.rs --model gpt-5.2
-review ./src/file.rs --model gpt-5.2 --verify claude
+review ./src/file.rs --model gpt-5.4
+review ./src/file.rs --model gpt-5.4 --verify claude
 review ./src/file.rs --notes "This handles settlement logic"
 review ./src/file.rs --patch
 ```
@@ -111,7 +111,7 @@ Pass anything recognised below to `--model` or set it as your default with `revi
 | Pattern | Example | Provider |
 |---|---|---|
 | `claude-*` | `claude-opus-4-7` | Anthropic |
-| `gpt-*` | `gpt-5.2`, `gpt-4o` | OpenAI |
+| `gpt-*` | `gpt-5.4`, `gpt-4o` | OpenAI |
 | `o1-*`, `o3-*`, `o4-*` | `o3-mini` | OpenAI |
 
 ### OpenRouter (one key, every model)
