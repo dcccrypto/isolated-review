@@ -15,7 +15,7 @@ async function call(model: string, system: string, user: string): Promise<Review
   const msg = await client().messages.create({
     model,
     max_tokens: 4096,
-    system,
+    system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: user }]
   });
   const block = msg.content.find(b => b.type === 'text');

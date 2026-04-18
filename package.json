@@ -1,6 +1,6 @@
 {
   "name": "isolated-review",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Deep code review of a single file in isolation",
   "license": "Apache-2.0",
   "author": "Khubair Nasir",
@@ -8,13 +8,30 @@
     "type": "git",
     "url": "git+https://github.com/dcccrypto/isolated-review.git"
   },
-  "bugs": { "url": "https://github.com/dcccrypto/isolated-review/issues" },
+  "bugs": {
+    "url": "https://github.com/dcccrypto/isolated-review/issues"
+  },
   "homepage": "https://github.com/dcccrypto/isolated-review#readme",
-  "keywords": ["cli", "code-review", "ai", "claude", "openai", "anthropic"],
+  "keywords": [
+    "cli",
+    "code-review",
+    "ai",
+    "claude",
+    "openai",
+    "anthropic"
+  ],
   "type": "module",
-  "bin": { "review": "dist/cli.js" },
-  "files": ["dist", "LICENSE", "README.md"],
-  "publishConfig": { "access": "public" },
+  "bin": {
+    "review": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "tsx src/cli.ts",
     "build": "tsc",
@@ -35,7 +52,9 @@
     "@types/node": "^20.14.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "vitest": "^3.2.4"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }

@@ -53,7 +53,10 @@ describe('anthropicProvider', () => {
     const args = mockCreate.mock.calls[0]![0];
     expect(args.model).toBe('claude-sonnet-4-5');
     expect(args.max_tokens).toBe(4096);
-    expect(args.system).toContain('You are a deep code reviewer');
+    expect(Array.isArray(args.system)).toBe(true);
+    expect(args.system[0].type).toBe('text');
+    expect(args.system[0].text).toContain('You are a deep code reviewer');
+    expect(args.system[0].cache_control).toEqual({ type: 'ephemeral' });
     expect(args.messages).toHaveLength(1);
     expect(args.messages[0].role).toBe('user');
     expect(args.messages[0].content).toContain('export const x = 1;');
@@ -70,7 +73,8 @@ describe('anthropicProvider', () => {
 
     expect(result.summary).toBe('v');
     const args = mockCreate.mock.calls[0]![0];
-    expect(args.system).toContain('You are validating and refining a prior code review');
+    expect(args.system[0].text).toContain('You are validating and refining a prior code review');
+    expect(args.system[0].cache_control).toEqual({ type: 'ephemeral' });
     expect(args.messages[0].content).toContain('## Prior review');
     expect(args.messages[0].content).toContain('"summary": "p"');
   });

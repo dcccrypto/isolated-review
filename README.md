@@ -156,6 +156,13 @@ The file is sent to the model with line numbers prepended (`  42 | <code>`) and 
 
 When `--verify` is set, the second model gets the original file and the first review, and is told to drop weak findings, strengthen valid ones, and only add something genuinely missed.
 
+## What gets sent where
+
+- **Your API keys** never leave your machine. They live in your shell env or in `~/.config/isolated-review/config.json` (`chmod 600`, owner-only) and are used only to construct the SDK client in-process.
+- **The file you review** is sent to the provider you selected (Anthropic, OpenAI, or OpenRouter), verbatim, with line numbers prepended. If the file contains anything sensitive (credentials, internal identifiers, PII), consider whether you want that provider to see it.
+- **Prompts are cached** on Anthropic via `cache_control: ephemeral` on the system block — repeat runs within ~5 minutes hit the cache and cost ~90% less on the system prompt. OpenAI applies its own automatic prompt caching on longer prompts. OpenRouter passes caching through where the upstream model supports it.
+- **Nothing is logged or phoned home** by this CLI itself — output goes to your terminal, exit code is all.
+
 ## What this tool won't do
 
 By design. Rejecting these is the product.
