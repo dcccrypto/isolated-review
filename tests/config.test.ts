@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, statSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadKeys, saveKeys, getConfigPath } from '../src/utils/config.js';
+import { loadConfig, loadKeys, saveConfig, saveKeys, getConfigPath } from '../src/utils/config.js';
 
 describe('config', () => {
   let dir: string;
@@ -20,8 +20,10 @@ describe('config', () => {
     process.env = { ...origEnv };
   });
 
-  it('loadKeys returns empty when no file and no env', () => {
-    expect(loadKeys()).toEqual({ anthropic: undefined, openai: undefined });
+  it('loadConfig returns empty when no file and no env', () => {
+    expect(loadConfig()).toEqual({
+      anthropic: undefined, openai: undefined, defaultModel: undefined
+    });
   });
 
   it('saveKeys writes JSON file with 0600 permissions', () => {
@@ -36,26 +38,46 @@ describe('config', () => {
     }
   });
 
-  it('saveKeys merges with existing config, does not clobber other keys', () => {
+  it('saveConfig merges with existing config, does not clobber other fields', () => {
     saveKeys({ anthropic: 'first', openai: 'second' });
-    saveKeys({ openai: 'third' });
+    saveConfig({ defaultModel: 'claude-opus-4-7' });
     const parsed = JSON.parse(readFileSync(getConfigPath(), 'utf8'));
-    expect(parsed).toEqual({ anthropic: 'first', openai: 'third' });
+    expect(parsed).toEqual({
+      anthropic: 'first', openai: 'second', defaultModel: 'claude-opus-4-7'
+    });
   });
 
-  it('loadKeys reads stored config', () => {
-    saveKeys({ anthropic: 'stored-a', openai: 'stored-o' });
-    expect(loadKeys()).toEqual({ anthropic: 'stored-a', openai: 'stored-o' });
+  it('saveConfig with an empty string deletes that field', () => {
+    saveConfig({ anthropic: 'first', defaultModel: 'claude' });
+    saveConfig({ defaultModel: '' });
+    const parsed = JSON.parse(readFileSync(getConfigPath(), 'utf8'));
+    expect(parsed).toEqual({ anthropic: 'first' });
   });
 
-  it('process.env takes precedence over config file', () => {
-    saveKeys({ anthropic: 'stored-a', openai: 'stored-o' });
+  it('loadConfig reads stored values including defaultModel', () => {
+    saveConfig({ anthropic: 'a', openai: 'o', defaultModel: 'claude-sonnet-4-6' });
+    expect(loadConfig()).toEqual({
+      anthropic: 'a', openai: 'o', defaultModel: 'claude-sonnet-4-6'
+    });
+  });
+
+  it('process.env takes precedence over config file for API keys', () => {
+    saveConfig({ anthropic: 'stored-a', openai: 'stored-o' });
     process.env.ANTHROPIC_API_KEY = 'env-a';
-    expect(loadKeys()).toEqual({ anthropic: 'env-a', openai: 'stored-o' });
+    const c = loadConfig();
+    expect(c.anthropic).toBe('env-a');
+    expect(c.openai).toBe('stored-o');
   });
 
-  it('loadKeys tolerates a corrupt config file', () => {
+  it('loadKeys still works as a thin wrapper', () => {
+    saveKeys({ anthropic: 'ak', openai: 'ok' });
+    expect(loadKeys()).toEqual({ anthropic: 'ak', openai: 'ok' });
+  });
+
+  it('loadConfig tolerates a corrupt config file', () => {
     writeFileSync(getConfigPath(), 'not json');
-    expect(loadKeys()).toEqual({ anthropic: undefined, openai: undefined });
+    expect(loadConfig()).toEqual({
+      anthropic: undefined, openai: undefined, defaultModel: undefined
+    });
   });
 });

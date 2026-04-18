@@ -2,10 +2,13 @@ import { readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync } from 'n
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-export interface Keys {
+export interface Config {
   anthropic?: string;
   openai?: string;
+  defaultModel?: string;
 }
+
+export type Keys = Pick<Config, 'anthropic' | 'openai'>;
 
 export function getConfigDir(): string {
   return process.env.IR_CONFIG_DIR ?? join(homedir(), '.config', 'isolated-review');
@@ -15,43 +18,51 @@ export function getConfigPath(): string {
   return join(getConfigDir(), 'config.json');
 }
 
-function readConfigFile(): Keys {
+function readConfigFile(): Config {
   const path = getConfigPath();
   if (!existsSync(path)) return {};
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Keys;
-    return {
-      anthropic: typeof parsed.anthropic === 'string' ? parsed.anthropic : undefined,
-      openai:    typeof parsed.openai    === 'string' ? parsed.openai    : undefined
-    };
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+    const clean: Config = {};
+    if (typeof parsed.anthropic    === 'string') clean.anthropic    = parsed.anthropic;
+    if (typeof parsed.openai       === 'string') clean.openai       = parsed.openai;
+    if (typeof parsed.defaultModel === 'string') clean.defaultModel = parsed.defaultModel;
+    return clean;
   } catch {
     return {};
   }
 }
 
-export function loadKeys(): Keys {
-  const fromFile = readConfigFile();
+export function loadConfig(): Config {
+  const file = readConfigFile();
   return {
-    anthropic: process.env.ANTHROPIC_API_KEY || fromFile.anthropic,
-    openai:    process.env.OPENAI_API_KEY    || fromFile.openai
+    anthropic:    process.env.ANTHROPIC_API_KEY || file.anthropic,
+    openai:       process.env.OPENAI_API_KEY    || file.openai,
+    defaultModel: file.defaultModel
   };
 }
 
-export function saveKeys(patch: Keys): void {
+export function loadKeys(): Keys {
+  const c = loadConfig();
+  return { anthropic: c.anthropic, openai: c.openai };
+}
+
+export function saveConfig(patch: Partial<Config>): void {
   const dir = getConfigDir();
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   try { chmodSync(dir, 0o700); } catch { /* non-fatal on non-POSIX fs */ }
 
   const current = readConfigFile();
-  const merged: Keys = {
-    anthropic: patch.anthropic ?? current.anthropic,
-    openai:    patch.openai    ?? current.openai
-  };
+  const merged: Config = { ...current };
+  for (const [key, value] of Object.entries(patch) as [keyof Config, string | undefined][]) {
+    if (value === undefined || value === '') delete merged[key];
+    else merged[key] = value;
+  }
 
-  const clean: Keys = {};
-  if (merged.anthropic) clean.anthropic = merged.anthropic;
-  if (merged.openai)    clean.openai    = merged.openai;
-
-  writeFileSync(getConfigPath(), JSON.stringify(clean, null, 2) + '\n', { mode: 0o600 });
+  writeFileSync(getConfigPath(), JSON.stringify(merged, null, 2) + '\n', { mode: 0o600 });
   try { chmodSync(getConfigPath(), 0o600); } catch { /* non-fatal */ }
+}
+
+export function saveKeys(patch: Keys): void {
+  saveConfig(patch);
 }

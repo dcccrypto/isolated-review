@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { runReview, type ReviewOpts } from './commands/review.js';
 import { runKeysSetup } from './commands/keys.js';
+import { runSettings } from './commands/settings.js';
 
 const program = new Command();
 
@@ -24,8 +25,21 @@ program
   });
 
 program
+  .command('settings')
+  .description('Interactively set the default review model')
+  .action(async () => {
+    try {
+      const output = await runSettings();
+      process.stdout.write(output);
+    } catch (e) {
+      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+      process.exit(1);
+    }
+  });
+
+program
   .argument('<file>', 'path to the file to review')
-  .option('--model <name>',  'primary review model', 'claude')
+  .option('--model <name>',  'primary review model (default: from settings, or "claude")')
   .option('--verify <name>', 'optional second-pass verifier model')
   .option('--notes <text>',  'extra context for the reviewer')
   .option('--patch',         'ask for suggested patch/diff ideas', false)

@@ -5,6 +5,7 @@ import { anthropicProvider } from '../providers/anthropic.js';
 import { openaiProvider } from '../providers/openai.js';
 import { createTheme } from '../utils/theme.js';
 import { renderJson, renderPretty } from '../utils/output.js';
+import { loadConfig } from '../utils/config.js';
 import type { Provider, ReviewInput, ReviewResult } from '../providers/types.js';
 
 const providers: Record<Provider['name'], Provider> = {
@@ -13,7 +14,7 @@ const providers: Record<Provider['name'], Provider> = {
 };
 
 export interface ReviewOpts {
-  model: string;
+  model?: string;
   verify?: string;
   notes?: string;
   patch: boolean;
@@ -23,7 +24,9 @@ export interface ReviewOpts {
 
 export async function runReview(filePath: string, opts: ReviewOpts): Promise<string> {
   const file = await readSourceFile(filePath);
-  const primary = resolveModel(opts.model);
+  const config = loadConfig();
+  const modelName = opts.model ?? config.defaultModel ?? 'claude';
+  const primary = resolveModel(modelName);
   const provider = providers[primary.provider];
   const input: ReviewInput = {
     filePath: file.absolutePath,

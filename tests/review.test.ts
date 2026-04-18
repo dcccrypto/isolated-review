@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -35,11 +35,19 @@ function makeFile(content = 'export const x = 1;\n', ext = 'ts') {
 }
 
 describe('runReview', () => {
+  const origEnv = { ...process.env };
+
   beforeEach(() => {
     anthropicReview.mockReset();
     anthropicVerify.mockReset();
     openaiReview.mockReset();
     openaiVerify.mockReset();
+    process.env.IR_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'ir-review-cfg-'));
+  });
+
+  afterEach(() => {
+    if (process.env.IR_CONFIG_DIR) rmSync(process.env.IR_CONFIG_DIR, { recursive: true, force: true });
+    process.env = { ...origEnv };
   });
 
   it('runs a single-pass review through the Anthropic provider when model is claude', async () => {
@@ -57,7 +65,7 @@ describe('runReview', () => {
 
     expect(anthropicReview).toHaveBeenCalledTimes(1);
     expect(openaiReview).not.toHaveBeenCalled();
-    expect(anthropicReview.mock.calls[0]![0]).toBe('claude-sonnet-4-5-20250929');
+    expect(anthropicReview.mock.calls[0]![0]).toBe('claude-sonnet-4-6');
     expect(out).toContain('review');
     expect(out).toContain('Looks good.');
     expect(out).toContain('Critical  (1)');
@@ -162,6 +170,51 @@ describe('runReview', () => {
     await expect(runReview(file.path, {
       model: 'claude', patch: false, json: false, plain: true
     })).rejects.toThrow(/429 rate limited/);
+    rmSync(file.dir, { recursive: true });
+  });
+
+  it('falls back to defaultModel from config when --model is omitted', async () => {
+    const { saveConfig } = await import('../src/utils/config.js');
+    saveConfig({ defaultModel: 'claude-opus' });
+
+    const payload: ReviewResult = { summary: 's', findings: [] };
+    anthropicReview.mockResolvedValue(payload);
+
+    const { runReview } = await import('../src/commands/review.js');
+    const file = makeFile();
+    await runReview(file.path, { patch: false, json: true, plain: false });
+
+    expect(anthropicReview.mock.calls[0]![0]).toBe('claude-opus-4-7');
+    rmSync(file.dir, { recursive: true });
+  });
+
+  it('falls back to "claude" when neither --model nor defaultModel are set', async () => {
+    const payload: ReviewResult = { summary: 's', findings: [] };
+    anthropicReview.mockResolvedValue(payload);
+
+    const { runReview } = await import('../src/commands/review.js');
+    const file = makeFile();
+    await runReview(file.path, { patch: false, json: true, plain: false });
+
+    expect(anthropicReview.mock.calls[0]![0]).toBe('claude-sonnet-4-6');
+    rmSync(file.dir, { recursive: true });
+  });
+
+  it('--model takes precedence over defaultModel', async () => {
+    const { saveConfig } = await import('../src/utils/config.js');
+    saveConfig({ defaultModel: 'claude-opus' });
+
+    const payload: ReviewResult = { summary: 's', findings: [] };
+    openaiReview.mockResolvedValue(payload);
+
+    const { runReview } = await import('../src/commands/review.js');
+    const file = makeFile();
+    await runReview(file.path, {
+      model: 'gpt-4o', patch: false, json: true, plain: false
+    });
+
+    expect(openaiReview.mock.calls[0]![0]).toBe('gpt-4o');
+    expect(anthropicReview).not.toHaveBeenCalled();
     rmSync(file.dir, { recursive: true });
   });
 });
