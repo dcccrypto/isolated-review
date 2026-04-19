@@ -77,4 +77,18 @@ describe('runInit non-interactive', () => {
     expect(cfg.anthropic).toMatch(/^sk-ant-old-/);
     expect(cfg.openai).toMatch(/^sk-w+$/);
   });
+
+  it('refuses --key - when stdin is a TTY (would hang forever)', async () => {
+    // Force the isTTY getter true for this test.
+    const origIsTTY = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true });
+    try {
+      await expect(
+        runInit({ provider: 'anthropic', key: '-', yes: true })
+      ).rejects.toThrow(/--key - requires piped input/);
+    } finally {
+      if (origIsTTY) Object.defineProperty(process.stdin, 'isTTY', origIsTTY);
+      else delete (process.stdin as Record<string, unknown>).isTTY;
+    }
+  });
 });

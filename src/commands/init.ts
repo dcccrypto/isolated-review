@@ -130,7 +130,12 @@ export interface InitOpts {
 }
 
 function readKeyArg(raw: string): string {
-  if (raw === '-')  return readFileSync(0, 'utf8').replace(/[\r\n]+/g, '');
+  if (raw === '-') {
+    if (process.stdin.isTTY) {
+      throw new Error('--key - requires piped input. Try: printf %s "$KEY" | review init --key - --provider <name>  (or use --key @/path/to/file instead)');
+    }
+    return readFileSync(0, 'utf8').replace(/[\r\n]+/g, '');
+  }
   if (raw.startsWith('@')) return readFileSync(raw.slice(1), 'utf8').replace(/[\r\n]+/g, '');
   return raw;
 }

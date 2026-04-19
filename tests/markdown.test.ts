@@ -64,4 +64,68 @@ describe('toMarkdown', () => {
     });
     expect(md).toContain('claude-sonnet-4-6 → claude-opus-4-7');
   });
+
+  it('shows zero-counts line and no severity sections for a clean review', () => {
+    const md = toMarkdown({
+      filePath: 'foo.ts',
+      model: 'claude',
+      result: { summary: 'Looks good. Nothing to flag.', findings: [] }
+    });
+    expect(md).toContain('**0 critical · 0 medium · 0 low**');
+    expect(md).toContain('Looks good. Nothing to flag.');
+    expect(md).not.toContain('#### Critical');
+    expect(md).not.toContain('#### Medium');
+    expect(md).not.toContain('#### Low');
+  });
+
+  it('omits location suffix when a finding has no location', () => {
+    const md = toMarkdown({
+      filePath: 'foo.ts',
+      model: 'claude',
+      result: {
+        summary: 's',
+        findings: [{ title: 'Unlocated', severity: 'medium', explanation: 'e' }]
+      }
+    });
+    expect(md).toContain('- **Unlocated**');
+    expect(md).not.toContain('`foo.ts:undefined');
+    expect(md).not.toContain('foo.ts:0');
+  });
+
+  it('skips the token/cost bar when no usage is provided', () => {
+    const md = toMarkdown({
+      filePath: 'foo.ts',
+      model: 'claude',
+      result: { summary: 's', findings: [] }
+    });
+    expect(md).not.toMatch(/\d+k in/);
+    expect(md).not.toMatch(/\$\d/);
+  });
+
+  it('includes notes block when present', () => {
+    const md = toMarkdown({
+      filePath: 'foo.ts',
+      model: 'claude',
+      result: { summary: 's', findings: [], notes: 'deprecation warning only; not blocking' }
+    });
+    expect(md).toContain('deprecation warning only; not blocking');
+  });
+
+  it('quotes snippets in fenced code blocks, never as inline code', () => {
+    const md = toMarkdown({
+      filePath: 'foo.ts',
+      model: 'claude',
+      result: {
+        summary: 's',
+        findings: [{
+          title: 'X',
+          severity: 'critical',
+          explanation: 'e',
+          snippet: 'const x = `template ${with} backticks`'
+        }]
+      }
+    });
+    expect(md).toContain('```');
+    expect(md).toContain('const x = `template ${with} backticks`');
+  });
 });
