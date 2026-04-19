@@ -4,13 +4,14 @@ import { runReview, type ReviewOpts } from './commands/review.js';
 import { runKeysSetup } from './commands/keys.js';
 import { runSettings } from './commands/settings.js';
 import { runInit } from './commands/init.js';
+import { pickFile } from './commands/pick.js';
 
 const program = new Command();
 
 program
   .name('review')
   .description('Deep code review of a single file in isolation')
-  .version('0.4.0');
+  .version('0.5.0');
 
 function wrap(fn: () => Promise<string>) {
   return async () => {
@@ -39,7 +40,8 @@ program
   .action(wrap(runSettings));
 
 program
-  .argument('<file>', 'path to the file to review')
+  .argument('[file]',        'path to the file to review (omit with --pick to choose interactively)')
+  .option('--pick',          'interactively pick a file from the current directory', false)
   .option('--model <name>',  'primary review model (default: from settings, or "claude")')
   .option('--verify <name>', 'optional second-pass verifier model')
   .option('--notes <text>',  'extra context for the reviewer')
@@ -47,7 +49,7 @@ program
   .option('--diff [base]',   'review only lines changed vs a git base (default: HEAD)')
   .option('--json',          'emit machine-readable JSON', false)
   .option('--plain',         'disable color and unicode formatting', false)
-  .action(async (file: string, rawOpts: Omit<ReviewOpts, 'diff'> & { diff?: string | boolean }) => {
+  .action(async (file: string | undefined, rawOpts: Omit<ReviewOpts, 'diff'> & { diff?: string | boolean; pick?: boolean }) => {
     const d = rawOpts.diff;
     const diff: string | undefined =
       d === undefined || d === false ? undefined
@@ -55,7 +57,15 @@ program
       : d;
     const opts: ReviewOpts = { ...rawOpts, diff };
     try {
-      const output = await runReview(file, opts);
+      let target = file;
+      if (!target && rawOpts.pick) {
+        target = await pickFile(process.cwd());
+      }
+      if (!target) {
+        console.error('error: missing file. Pass a path, or use --pick for an interactive picker.');
+        process.exit(1);
+      }
+      const output = await runReview(target, opts);
       console.log(output);
     } catch (e) {
       console.error(`error: ${e instanceof Error ? e.message : String(e)}`);

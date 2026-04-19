@@ -1,6 +1,6 @@
 {
   "name": "isolated-review",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Deep code review of a single file in isolation",
   "license": "Apache-2.0",
   "author": "Khubair Nasir",
@@ -43,6 +43,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.0",
+    "@inquirer/prompts": "^8.4.1",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "openai": "^4.70.0",

@@ -9,9 +9,11 @@ Deep code review of a single file, in isolation, from the command line. The tool
 
 ```bash
 npm install -g isolated-review
-review init        # one-time setup: keys + default model
-review <file>
+review init        # one-time setup (pastes your API keys + picks a default model)
+review --pick      # opens a file picker — arrow keys, type to filter, enter to review
 ```
+
+That's it. Three commands, done.
 
 ## Install
 
@@ -87,6 +89,7 @@ review ./src/file.rs --patch
 
 | Option | Description |
 |---|---|
+| `--pick` | Interactive file picker — fuzzy search across the current directory. Typing narrows the list. |
 | `--model <name>` | Primary review model. Default: `claude` (or your `review settings` default). |
 | `--verify <name>` | Optional second-pass verifier model. |
 | `--notes "<text>"` | Extra context the reviewer should consider. |
@@ -94,6 +97,16 @@ review ./src/file.rs --patch
 | `--diff [base]` | Review only lines changed vs a git base (default: `HEAD`). Great for PR workflows. |
 | `--json` | Emit machine-readable JSON (stable keys, no spinner, pipe into `jq`). |
 | `--plain` | Disable color and unicode formatting (ASCII only). |
+
+### Don't want to type the path?
+
+```bash
+review --pick                      # choose any source file in the current dir
+review --pick --verify claude      # picker + verifier pass
+review --pick --diff main          # pick a file, review only its diff vs main
+```
+
+The picker walks the current directory (skipping `node_modules`, `dist`, `.git`, etc.), shows matches as you type, and hands the choice straight into the normal review flow. All your other flags work alongside it.
 
 ### Review only what changed
 
