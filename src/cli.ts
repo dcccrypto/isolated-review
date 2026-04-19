@@ -36,8 +36,23 @@ program
 
 program
   .command('keys')
-  .description('Set API keys (Anthropic, OpenAI, OpenRouter)')
-  .action(wrap(runKeysSetup));
+  .description('Set API keys (Anthropic, OpenAI, OpenRouter). Use --from-stdin for paste-immune entry.')
+  .option('--provider <name>',  'which provider to set (required with --from-stdin or --from-file)')
+  .option('--from-stdin',       'read the key from stdin (no terminal paste, no truncation risk)')
+  .option('--from-file <path>', 'read the key from a file')
+  .action(async (opts: { provider?: 'anthropic'|'openai'|'openrouter'; fromStdin?: boolean; fromFile?: string }) => {
+    try {
+      const out = await runKeysSetup(opts);
+      process.stdout.write(out);
+    } catch (e) {
+      if (e instanceof Error && e.name === 'ExitPromptError') {
+        console.error('cancelled.');
+        process.exit(130);
+      }
+      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+      process.exit(1);
+    }
+  });
 
 program
   .command('settings')
