@@ -43,7 +43,8 @@ function locationLabel(filePath: string, f: Finding): string | null {
 function renderFinding(filePath: string, f: Finding, t: Theme): string {
   const sym = t.sym[f.severity];
   const color = t[f.severity];
-  const head = `  ${color(sym)} ${t.header(f.title)}`;
+  const tag = f.category ? `  ${t.muted('[' + f.category + ']')}` : '';
+  const head = `  ${color(sym)} ${t.header(f.title)}${tag}`;
   const loc = locationLabel(filePath, f);
   const locLine = loc ? `\n     ${t.muted(loc)}` : '';
   const snip = f.snippet ? `\n     ${t.muted(f.snippet)}` : '';

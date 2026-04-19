@@ -1,4 +1,5 @@
 export type Severity = 'critical' | 'medium' | 'low';
+export type Category = 'correctness' | 'security' | 'performance' | 'maintainability' | 'style';
 
 export interface Location {
   startLine: number;
@@ -8,6 +9,7 @@ export interface Location {
 export interface Finding {
   title: string;
   severity: Severity;
+  category?: Category;
   location?: Location;
   snippet?: string;
   explanation: string;
@@ -28,6 +30,7 @@ export interface ReviewInput {
   userNotes?: string;
   includePatch: boolean;
   focusRanges?: Location[];
+  promptName?: string;
 }
 
 export interface Usage {

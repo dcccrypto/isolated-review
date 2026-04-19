@@ -38,7 +38,7 @@ async function call(model: string, system: string, user: string): Promise<Review
 export const openaiProvider: Provider = {
   name: 'openai',
   async review(model, input) {
-    const { system, user } = buildReviewMessages(input);
+    const { system, user } = buildReviewMessages(input, input.promptName);
     return call(model, system, user);
   },
   async verify(model, input, prior) {

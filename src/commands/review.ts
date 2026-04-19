@@ -24,6 +24,7 @@ export interface ReviewOpts {
   json: boolean;
   plain: boolean;
   diff?: string;
+  prompt?: string;
 }
 
 export async function runReview(filePath: string, opts: ReviewOpts): Promise<string> {
@@ -48,7 +49,8 @@ export async function runReview(filePath: string, opts: ReviewOpts): Promise<str
     content: file.content,
     userNotes: opts.notes,
     includePatch: opts.patch,
-    focusRanges
+    focusRanges,
+    promptName: opts.prompt
   };
 
   const started = Date.now();

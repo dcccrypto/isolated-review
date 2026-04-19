@@ -94,6 +94,7 @@ review ./src/file.rs --patch
 | `review init` | One-shot setup — keys + default model in one walk-through. |
 | `review keys` | Set API keys only. |
 | `review settings` | Set the default review model only. |
+| `review prompts` | List built-in and user-defined prompt presets. |
 
 ### Options
 
@@ -107,6 +108,29 @@ review ./src/file.rs --patch
 | `--diff [base]` | Review only lines changed vs a git base (default: `HEAD`). Great for PR workflows. |
 | `--json` | Emit machine-readable JSON (stable keys, no spinner, pipe into `jq`). |
 | `--plain` | Disable color and unicode formatting (ASCII only). |
+
+### Specialised prompts
+
+Pick the angle that fits the file:
+
+```bash
+review src/auth.ts --prompt security    # security-only review
+review src/router.ts --prompt perf      # perf-only review
+review src/legacy.ts --prompt refactor  # design + maintainability review
+review src/foo.ts                        # default = balanced full-spectrum
+```
+
+`review prompts` lists everything available. Built-in: `default`, `security`, `perf`, `refactor`.
+
+You can write your own:
+
+```bash
+mkdir -p ~/.config/isolated-review/prompts
+echo "Your custom system prompt here." > ~/.config/isolated-review/prompts/house-style.md
+review src/foo.ts --prompt house-style
+```
+
+The schema instruction is appended automatically — your file just needs the system-prompt body.
 
 ### Don't want to type the path?
 

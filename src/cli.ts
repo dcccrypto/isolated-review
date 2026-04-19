@@ -5,13 +5,14 @@ import { runKeysSetup } from './commands/keys.js';
 import { runSettings } from './commands/settings.js';
 import { runInit } from './commands/init.js';
 import { pickFile } from './commands/pick.js';
+import { runListPrompts } from './commands/prompts.js';
 
 const program = new Command();
 
 program
   .name('review')
   .description('Deep code review of a single file in isolation')
-  .version('0.5.1');
+  .version('0.6.0');
 
 function wrap(fn: () => Promise<string>) {
   return async () => {
@@ -44,6 +45,11 @@ program
   .action(wrap(runSettings));
 
 program
+  .command('prompts')
+  .description('List built-in and user-defined prompt presets')
+  .action(wrap(runListPrompts));
+
+program
   .argument('[file]',        'path to the file to review (omit with --pick to choose interactively)')
   .option('--pick',          'interactively pick a file from the current directory', false)
   .option('--model <name>',  'primary review model (default: from settings, or "claude")')
@@ -51,6 +57,7 @@ program
   .option('--notes <text>',  'extra context for the reviewer')
   .option('--patch',         'ask for suggested patch/diff ideas', false)
   .option('--diff [base]',   'review only lines changed vs a git base (default: HEAD)')
+  .option('--prompt <name>', 'use a named prompt preset (run "review prompts" to list)', 'default')
   .option('--json',          'emit machine-readable JSON', false)
   .option('--plain',         'disable color and unicode formatting', false)
   .action(async (file: string | undefined, rawOpts: Omit<ReviewOpts, 'diff'> & { diff?: string | boolean; pick?: boolean }) => {
