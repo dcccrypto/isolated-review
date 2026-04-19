@@ -67,6 +67,16 @@ Resolution order:
 
 Missing keys produce a clean error pointing you at `review keys`. Keys are **hidden as you paste them** in `review init` / `review keys` (rendered as `*`), and never echoed or logged.
 
+### Verifying the install
+
+Every release is published from a pinned GitHub Actions workflow with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) — a sigstore-backed attestation tying each tarball to the commit that built it. After installing, you can verify it yourself:
+
+```bash
+npm audit signatures
+```
+
+See [`SECURITY.md`](SECURITY.md) for the full supply-chain posture and vulnerability reporting channel.
+
 ## Usage
 
 ```bash
