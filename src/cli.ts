@@ -6,6 +6,7 @@ import { runSettings } from './commands/settings.js';
 import { runInit } from './commands/init.js';
 import { pickFile } from './commands/pick.js';
 import { runListPrompts, runPromptNew, runPromptEdit, runPromptShow } from './commands/prompts.js';
+import { runPromptGenerate } from './commands/promptGenerate.js';
 import { runStatus } from './commands/status.js';
 
 const program = new Command();
@@ -13,7 +14,7 @@ const program = new Command();
 program
   .name('review')
   .description('Deep code review of a single file in isolation')
-  .version('0.7.0');
+  .version('0.7.1');
 
 function wrap(fn: () => Promise<string>) {
   return async () => {
@@ -93,6 +94,20 @@ promptsCmd.command('edit <name>')
 promptsCmd.command('show <name>')
   .description('Print a prompt to stdout (for inspection/debugging)')
   .action(wrapArg(runPromptShow));
+promptsCmd.command('generate [name] [description]')
+  .description('AI-generate a custom reviewer prompt from a one-line description')
+  .action(async (name: string | undefined, description: string | undefined) => {
+    try {
+      process.stdout.write(await runPromptGenerate(name, description));
+    } catch (e) {
+      if (e instanceof Error && e.name === 'ExitPromptError') {
+        console.error('cancelled.');
+        process.exit(130);
+      }
+      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+      process.exit(1);
+    }
+  });
 
 program
   .argument('[file]',            'path to the file to review (omit with --pick to choose interactively)')

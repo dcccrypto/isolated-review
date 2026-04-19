@@ -95,7 +95,7 @@ review ./src/file.rs --patch
 | `review keys` | Set API keys only. |
 | `review settings` | Set the default review model only. |
 | `review status` | Show current config (keys set, default model, prompts). |
-| `review prompts` | List prompt presets. Subcommands: `new <name>`, `edit <name>`, `show <name>`. |
+| `review prompts` | List prompt presets. Subcommands: `new`, `edit`, `show`, `generate`. |
 
 ### Options
 
@@ -126,10 +126,18 @@ review src/foo.ts                        # default = balanced full-spectrum
 You can write your own — the easy way:
 
 ```bash
+# Let AI write it for you from a one-line description:
+review prompts generate anchor-audit "Solana Anchor programs, focus on signer/PDA/CPI safety"
+
+# Or scaffold a template and fill it in yourself:
 review prompts new anchor-audit    # scaffolds a template and opens $EDITOR
-review src/program.rs --prompt anchor-audit
-review prompts edit anchor-audit   # iterate
+
+# Iterate on an existing prompt:
+review prompts edit anchor-audit
 review prompts show anchor-audit   # print it back (handy for debugging)
+
+# Use it:
+review src/program.rs --prompt anchor-audit
 ```
 
 Or point at a file directly for a one-off (no install into the config dir):
