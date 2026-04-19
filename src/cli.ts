@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { runReview, type ReviewOpts } from './commands/review.js';
+import { runReview, meetsFailThreshold, type ReviewOpts } from './commands/review.js';
 import { EFFORT_LEVELS, type Effort } from './providers/types.js';
 import { copyToClipboard } from './utils/clipboard.js';
 import { waitForKey } from './utils/keypress.js';
 import { createTheme } from './utils/theme.js';
+import { openAtLine } from './utils/open.js';
+import { runDoctor } from './commands/doctor.js';
+import { runCompletion } from './commands/completion.js';
+import { loadLastRun, saveLastRun } from './utils/config.js';
 import { runKeysSetup } from './commands/keys.js';
 import { runSettings } from './commands/settings.js';
 import { runInit } from './commands/init.js';
@@ -18,7 +22,7 @@ const program = new Command();
 program
   .name('review')
   .description('Deep code review of a single file in isolation')
-  .version('0.10.0');
+  .version('0.11.0');
 
 function wrap(fn: () => Promise<string>) {
   return async () => {
@@ -52,8 +56,20 @@ function wrapArg<A>(fn: (arg: A) => Promise<string>) {
 
 program
   .command('init')
-  .description('One-shot setup: API keys + default model')
-  .action(wrap(runInit));
+  .description('One-shot setup: API keys + default model. Also supports --provider/--key/--default-model/--yes for scripts.')
+  .option('--provider <name>',      'anthropic | openai | openrouter (requires --key)')
+  .option('--key <value>',          'API key value, "@/path/to/file", or "-" to read from stdin')
+  .option('--default-model <name>', 'set the default model at the same time')
+  .option('--yes',                  'confirm non-interactive mode without any prompts')
+  .action(async (opts: { provider?: 'anthropic' | 'openai' | 'openrouter'; key?: string; defaultModel?: string; yes?: boolean }) => {
+    try {
+      process.stdout.write(await runInit(opts));
+    } catch (e) {
+      if (e instanceof Error && e.name === 'ExitPromptError') { console.error('cancelled.'); process.exit(130); }
+      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+      process.exit(1);
+    }
+  });
 
 program
   .command('keys')
@@ -84,6 +100,23 @@ program
   .command('status')
   .description('Show current config: keys set, default model, prompts available')
   .action(wrap(runStatus));
+
+program
+  .command('doctor')
+  .description('Offline health check: Node, git, config, key formats, clipboard, default model')
+  .action(wrap(runDoctor));
+
+program
+  .command('completion <shell>')
+  .description('Print a shell completion script (bash | zsh | fish). Install instructions in the script comments.')
+  .action(async (shell: string) => {
+    try {
+      process.stdout.write(await runCompletion(shell));
+    } catch (e) {
+      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+      process.exit(1);
+    }
+  });
 
 const promptsCmd = program
   .command('prompts')
@@ -125,9 +158,12 @@ program
   .option('--prompt <name>',     'use a named prompt preset (run "review prompts" to list)', 'default')
   .option('--prompt-file <path>','use the system prompt from an ad-hoc file (mutually exclusive with --prompt)')
   .option('--copy',              'copy a shareable markdown summary to the clipboard after the review', false)
+  .option('--open',              'open the first critical finding in $EDITOR after the review', false)
+  .option('--fail-on <severity>','exit 2 if any finding >= severity exists (critical | medium | low). For CI gates and pre-commit hooks.')
+  .option('--last',              're-run the previous review (same file + flags, unless overridden)', false)
   .option('--json',              'emit machine-readable JSON', false)
   .option('--plain',             'disable color and unicode formatting', false)
-  .action(async (file: string | undefined, rawOpts: Omit<ReviewOpts, 'diff' | 'effort'> & { diff?: string | boolean; pick?: boolean; effort?: string; copy?: boolean }) => {
+  .action(async (file: string | undefined, rawOpts: Omit<ReviewOpts, 'diff' | 'effort' | 'failOn'> & { diff?: string | boolean; pick?: boolean; effort?: string; copy?: boolean; open?: boolean; failOn?: string; last?: boolean }) => {
     const d = rawOpts.diff;
     const diff: string | undefined =
       d === undefined || d === false ? undefined
@@ -141,9 +177,38 @@ program
       }
       effort = rawOpts.effort as Effort;
     }
-    const opts: ReviewOpts = { ...rawOpts, diff, effort };
+    let failOn: 'critical' | 'medium' | 'low' | undefined;
+    if (rawOpts.failOn !== undefined) {
+      if (!['critical', 'medium', 'low'].includes(rawOpts.failOn)) {
+        console.error(`error: invalid --fail-on value "${rawOpts.failOn}". valid: critical, medium, low`);
+        process.exit(1);
+      }
+      failOn = rawOpts.failOn as 'critical' | 'medium' | 'low';
+    }
+    let opts: ReviewOpts = { ...rawOpts, diff, effort, failOn };
     try {
       let target = file;
+      if (rawOpts.last) {
+        const last = loadLastRun();
+        if (!last) {
+          console.error('error: no previous review recorded yet. Run `review <file>` at least once first.');
+          process.exit(1);
+        }
+        target = target ?? last.file;
+        opts = {
+          ...last,
+          ...opts,
+          model: opts.model ?? last.model,
+          verify: opts.verify ?? last.verify,
+          prompt: opts.prompt ?? last.prompt,
+          promptFile: opts.promptFile ?? last.promptFile,
+          effort: (opts.effort ?? last.effort) as Effort | undefined,
+          patch: opts.patch ?? last.patch ?? false,
+          diff: opts.diff ?? last.diff,
+          notes: opts.notes ?? last.notes,
+          failOn
+        };
+      }
       if (!target && rawOpts.pick) {
         target = await pickFile(process.cwd());
       }
@@ -152,8 +217,25 @@ program
         process.exit(1);
       }
       const output = await runReview(target, opts);
+      try {
+        saveLastRun({
+          file: target,
+          model: opts.model,
+          verify: opts.verify,
+          prompt: opts.prompt,
+          promptFile: opts.promptFile,
+          effort: opts.effort,
+          patch: opts.patch,
+          diff: opts.diff,
+          notes: opts.notes,
+          ranAt: new Date().toISOString()
+        });
+      } catch { /* last-run cache is a nice-to-have, never break the review */ }
       console.log(output.text);
-      await postRender(output.markdown, { autoCopy: !!rawOpts.copy, json: opts.json, plain: opts.plain });
+      await postRender(output, { autoCopy: !!rawOpts.copy, autoOpen: !!rawOpts.open, json: opts.json, plain: opts.plain });
+      if (failOn && meetsFailThreshold(output.findings, failOn)) {
+        process.exit(2);
+      }
     } catch (e) {
       if (e instanceof Error && e.name === 'ExitPromptError') {
         console.error('cancelled.');
@@ -164,33 +246,63 @@ program
     }
   });
 
-async function postRender(markdown: string | undefined, ctx: { autoCopy: boolean; json: boolean; plain: boolean }): Promise<void> {
-  if (!markdown) return;
+interface PostRenderContext {
+  autoCopy: boolean;
+  autoOpen: boolean;
+  json: boolean;
+  plain: boolean;
+}
+
+async function postRender(output: { markdown?: string; firstCritical?: { filePath: string; startLine: number } }, ctx: PostRenderContext): Promise<void> {
   const t = createTheme({ plain: ctx.plain });
 
-  if (ctx.autoCopy) {
+  if (ctx.autoCopy && output.markdown) {
     try {
-      await copyToClipboard(markdown);
+      await copyToClipboard(output.markdown);
       process.stderr.write(` ${t.ok(t.sym.check)} ${t.muted('copied markdown summary to clipboard')}\n`);
     } catch (e) {
       process.stderr.write(` ${t.medium(t.sym.medium)} ${t.muted('copy failed:')} ${e instanceof Error ? e.message : String(e)}\n`);
     }
-    return;
   }
 
+  if (ctx.autoOpen && output.firstCritical) {
+    try {
+      const used = await openAtLine(output.firstCritical.filePath, output.firstCritical.startLine);
+      process.stderr.write(` ${t.ok(t.sym.check)} ${t.muted('opened:')} ${t.dim(used)}\n`);
+    } catch (e) {
+      process.stderr.write(` ${t.medium(t.sym.medium)} ${t.muted('open failed:')} ${e instanceof Error ? e.message : String(e)}\n`);
+    }
+  }
+
+  if (ctx.autoCopy || ctx.autoOpen) return;
   if (ctx.json) return;
+  if (!output.markdown) return;
   if (!process.stdout.isTTY) return;
   if (!process.stdin.isTTY) return;
 
-  process.stdout.write(` ${t.dim('[')}${t.accent('c')}${t.dim('] copy markdown  ')}${t.dim('[')}${t.accent('q')}${t.dim('] quit  ')}${t.dim('(auto-exits in 10s)')}\n`);
+  const canOpen = !!output.firstCritical;
+  const hintParts = [
+    `${t.dim('[')}${t.accent('c')}${t.dim('] copy')}`,
+    canOpen ? `${t.dim('[')}${t.accent('o')}${t.dim('] open first critical')}` : null,
+    `${t.dim('[')}${t.accent('q')}${t.dim('] quit')}`
+  ].filter(Boolean).join(t.dim('  '));
+  process.stdout.write(` ${hintParts}  ${t.dim('(auto-exits in 10s)')}\n`);
+
   const key = await waitForKey(10_000);
   if (!key) return;
-  if (key.name === 'c') {
+  if (key.name === 'c' && output.markdown) {
     try {
-      await copyToClipboard(markdown);
+      await copyToClipboard(output.markdown);
       process.stdout.write(` ${t.ok(t.sym.check)} ${t.muted('copied')}\n`);
     } catch (e) {
       process.stdout.write(` ${t.medium(t.sym.medium)} ${t.muted('copy failed:')} ${e instanceof Error ? e.message : String(e)}\n`);
+    }
+  } else if (key.name === 'o' && output.firstCritical) {
+    try {
+      const used = await openAtLine(output.firstCritical.filePath, output.firstCritical.startLine);
+      process.stdout.write(` ${t.ok(t.sym.check)} ${t.muted('opened:')} ${t.dim(used)}\n`);
+    } catch (e) {
+      process.stdout.write(` ${t.medium(t.sym.medium)} ${t.muted('open failed:')} ${e instanceof Error ? e.message : String(e)}\n`);
     }
   }
 }

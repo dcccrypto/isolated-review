@@ -1,4 +1,5 @@
 import { checkbox, password, select, input } from '@inquirer/prompts';
+import { readFileSync } from 'node:fs';
 import { createTheme, type Theme } from '../utils/theme.js';
 import { loadKeys, saveKeys, saveConfig, getConfigPath, type Keys } from '../utils/config.js';
 import { warnIfKeyMissing } from './settings.js';
@@ -121,7 +122,61 @@ async function askDefaultModel(t: Theme, configured: Set<ProviderId>): Promise<s
   return pick;
 }
 
-export async function runInit(): Promise<string> {
+export interface InitOpts {
+  provider?: ProviderId;
+  key?: string;
+  defaultModel?: string;
+  yes?: boolean;
+}
+
+function readKeyArg(raw: string): string {
+  if (raw === '-')  return readFileSync(0, 'utf8').replace(/[\r\n]+/g, '');
+  if (raw.startsWith('@')) return readFileSync(raw.slice(1), 'utf8').replace(/[\r\n]+/g, '');
+  return raw;
+}
+
+export async function runInitNonInteractive(opts: InitOpts): Promise<string> {
+  const t = createTheme();
+  const existing = loadKeys();
+
+  const saved: Array<[ProviderId, string]> = [];
+  if (opts.provider && opts.key) {
+    const value = readKeyArg(opts.key).trim();
+    if (!value) throw new Error('--key was empty');
+    const merged: Keys = {
+      anthropic:  existing.anthropic,
+      openai:     existing.openai,
+      openrouter: existing.openrouter,
+      [opts.provider]: value
+    };
+    saveKeys(merged);
+    saved.push([opts.provider, value]);
+  } else if (opts.provider && !opts.key) {
+    throw new Error('--provider requires --key (use "-" for stdin or "@file" for a file)');
+  } else if (!opts.provider && opts.key) {
+    throw new Error('--key requires --provider <anthropic|openai|openrouter>');
+  }
+
+  if (opts.defaultModel) {
+    resolveModel(opts.defaultModel);
+    saveConfig({ defaultModel: opts.defaultModel });
+  }
+
+  const lines: string[] = ['', ` ${t.ok(t.sym.check)} ${t.header('Setup complete')}`];
+  for (const [id, v] of saved) {
+    lines.push(`   ${t.muted(id.padEnd(10))}${t.dim(fingerprint(v))}`);
+  }
+  if (opts.defaultModel) lines.push(`   ${t.muted('default'.padEnd(10))}${t.accent(opts.defaultModel)}`);
+  lines.push(`   ${t.muted('config'.padEnd(10))}${t.dim(getConfigPath())}`);
+  lines.push('');
+  return lines.join('\n');
+}
+
+export async function runInit(opts: InitOpts = {}): Promise<string> {
+  if (opts.provider !== undefined || opts.key !== undefined || opts.defaultModel !== undefined || opts.yes) {
+    return runInitNonInteractive(opts);
+  }
+
   const t = createTheme();
   const existing = loadKeys();
 

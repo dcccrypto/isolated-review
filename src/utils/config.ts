@@ -9,6 +9,19 @@ export interface Config {
   defaultModel?: string;
 }
 
+export interface LastRun {
+  file: string;
+  model?: string;
+  verify?: string;
+  prompt?: string;
+  promptFile?: string;
+  effort?: string;
+  patch?: boolean;
+  diff?: string;
+  notes?: string;
+  ranAt: string;
+}
+
 export type Keys = Pick<Config, 'anthropic' | 'openai' | 'openrouter'>;
 
 export function getConfigDir(): string {
@@ -68,4 +81,24 @@ export function saveConfig(patch: Partial<Config>): void {
 
 export function saveKeys(patch: Keys): void {
   saveConfig(patch);
+}
+
+function lastRunPath(): string {
+  return join(getConfigDir(), 'last-run.json');
+}
+
+export function saveLastRun(run: LastRun): void {
+  const dir = getConfigDir();
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  writeFileSync(lastRunPath(), JSON.stringify(run, null, 2) + '\n', { mode: 0o600 });
+}
+
+export function loadLastRun(): LastRun | null {
+  const path = lastRunPath();
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as LastRun;
+  } catch {
+    return null;
+  }
 }

@@ -29,11 +29,14 @@ export interface ReviewOpts {
   prompt?: string;
   promptFile?: string;
   effort?: Effort;
+  failOn?: 'critical' | 'medium' | 'low';
 }
 
 export interface ReviewOutput {
   text: string;
   markdown?: string;
+  firstCritical?: { filePath: string; startLine: number };
+  findings: { critical: number; medium: number; low: number };
 }
 
 function formatBytes(n: number): string {
@@ -130,6 +133,16 @@ export async function runReview(filePath: string, opts: ReviewOpts): Promise<Rev
   const elapsedMs = Date.now() - started;
   const finalResp = verifiedResponse ?? primaryResponse;
 
+  const counts = {
+    critical: finalResp.result.findings.filter(f => f.severity === 'critical').length,
+    medium:   finalResp.result.findings.filter(f => f.severity === 'medium').length,
+    low:      finalResp.result.findings.filter(f => f.severity === 'low').length
+  };
+  const firstCriticalFinding = finalResp.result.findings.find(f => f.severity === 'critical' && f.location);
+  const firstCritical = firstCriticalFinding?.location
+    ? { filePath: file.absolutePath, startLine: firstCriticalFinding.location.startLine }
+    : undefined;
+
   if (opts.json) {
     const envelope: JsonEnvelope = {
       schemaVersion: 1,
@@ -142,7 +155,7 @@ export async function runReview(filePath: string, opts: ReviewOpts): Promise<Rev
       estimatedCostUsd: estimateCost(verifiedResponse ? (verifierModelName ?? primary.model) : primary.model, finalResp.usage) ?? undefined,
       result: finalResp.result
     };
-    return { text: renderJson(envelope) };
+    return { text: renderJson(envelope), findings: counts, firstCritical };
   }
 
   const theme = createTheme({ plain: opts.plain });
@@ -168,5 +181,11 @@ export async function runReview(filePath: string, opts: ReviewOpts): Promise<Rev
     elapsedMs,
     usage: finalResp.usage
   });
-  return { text, markdown };
+  return { text, markdown, findings: counts, firstCritical };
+}
+
+export function meetsFailThreshold(counts: { critical: number; medium: number; low: number }, threshold: 'critical' | 'medium' | 'low'): boolean {
+  if (threshold === 'critical') return counts.critical > 0;
+  if (threshold === 'medium')   return counts.critical > 0 || counts.medium > 0;
+  return counts.critical > 0 || counts.medium > 0 || counts.low > 0;
 }

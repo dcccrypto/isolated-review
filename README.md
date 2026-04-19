@@ -111,7 +111,10 @@ review ./src/file.rs --patch
 | `review keys` | Set API keys only. |
 | `review settings` | Set the default review model only. |
 | `review status` | Show current config (keys set, default model, prompts). |
+| `review doctor` | Offline health check: Node version, git, config readable, key formats, clipboard backend, default model resolves. |
 | `review prompts` | List prompt presets. Subcommands: `new`, `edit`, `show`, `generate`. |
+| `review completion <shell>` | Print a shell completion script for `bash`, `zsh`, or `fish`. See "Shell completion" below. |
+| `review --last` | Rerun the previous review (same file + flags). Override any flag to change that one. |
 
 ### Options
 
@@ -125,6 +128,9 @@ review ./src/file.rs --patch
 | `--diff [base]` | Review only lines changed vs a git base (default: `HEAD`). Great for PR workflows. Falls back to a full-file review with a stderr note for untracked files. |
 | `--effort <level>` | Reasoning effort: `none` / `minimal` / `low` / `medium` / `high` / `xhigh`. Maps to Anthropic extended thinking, OpenAI `reasoning_effort`, or OpenRouter `reasoning.effort`. See "Reasoning effort" below. |
 | `--copy` | After the review, copy a pasteable markdown summary (for Slack / PR comments / Linear) to the system clipboard. No waiting; just happens. |
+| `--open` | Open the first critical finding at its line in `$EDITOR` / `$VISUAL` (falls back to `code`, `open`, `xdg-open`). |
+| `--fail-on <severity>` | Exit code 2 if any finding at or above the level exists: `critical` / `medium` / `low`. For CI gates, git hooks. |
+| `--last` | Rerun the previous review. Any flag you also pass overrides the last one. |
 | `--prompt <name>` | Use a named prompt preset. Run `review prompts` to see the full list. Default: `default`. |
 | `--prompt-file <path>` | Use the system prompt from an ad-hoc file (no need to install it into the config dir). Mutually exclusive with `--prompt`. |
 | `--json` | Emit machine-readable JSON (stable keys, no spinner, pipe into `jq`). |
@@ -332,6 +338,112 @@ review src/foo.ts --copy
 ```
 
 Clipboard backends: `pbcopy` (macOS), `clip` (Windows), `wl-copy` / `xclip` / `xsel` (Linux — tried in that order). If none are installed the copy fails with a clean message; the review output itself is unaffected.
+
+### CI-friendly exit codes + `--fail-on`
+
+```bash
+review src/payment.ts --fail-on critical        # exit 2 if any critical finding
+review src/payment.ts --fail-on medium          # exit 2 if medium or critical
+review src/payment.ts --fail-on low             # exit 2 if any finding
+```
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Success, threshold not met |
+| `1` | Tool error (missing key, bad model, file not found) |
+| `2` | Findings meet the `--fail-on` threshold |
+
+Drop into a git pre-commit hook:
+
+```bash
+#!/usr/bin/env bash
+# .git/hooks/pre-commit
+for f in $(git diff --cached --name-only --diff-filter=AM | grep -E '\.(ts|tsx|js|py|rs|go)$'); do
+  review "$f" --diff --cached --fail-on critical --plain || exit 1
+done
+```
+
+### Keyboard shortcuts after a pretty review
+
+```
+ [c] copy  [o] open first critical  [q] quit  (auto-exits in 10s)
+```
+
+- **c** — copy the markdown summary to your clipboard
+- **o** — open the first critical finding at its line in `$EDITOR` / `$VISUAL` (falls back to `code`, `open`, `xdg-open`)
+- **q** / Enter / any other key — exit silently
+
+Use `--copy` or `--open` as flags for non-interactive / scripted usage (no waiting, no prompt).
+
+### `review --last`
+
+Rerun the previous review. Any flag you pass overrides that one bit.
+
+```bash
+review src/auth.ts --prompt security --model claude-opus --effort high
+# ... review runs ...
+
+# later, after editing the file:
+review --last                                  # same file, same prompt, same model, same effort
+review --last --model gpt-5.4                  # same file & flags, different model
+review --last --effort xhigh                   # same file & flags, harder thinking
+```
+
+### `review doctor`
+
+Offline sanity check — no API calls, just confirms your setup is healthy:
+
+```
+ review doctor  · offline health check
+ ───────────────────────────────────────────────
+ ✓  Node version       v22.12.0
+ ✓  git                found in PATH (required for --diff)
+ ✓  Config file        /Users/khubair/.config/isolated-review/config.json
+ ✓  Anthropic key      len=108 sk-a…eAAA
+ ◆  OpenAI key         not set
+ ✓  OpenRouter key     len=73 sk-o…xZ3K
+ ✓  Default model      claude → anthropic (claude-sonnet-4-6)
+ ✓  Clipboard backend  pbcopy
+ ✓  User prompts dir   /Users/khubair/.config/isolated-review/prompts · 2 user prompts
+```
+
+Run this first when something feels off. Covers: Node version, git in PATH, config readable, key format (length + prefix + length sanity — catches paste-truncation issues), clipboard backend, and whether your default model actually points at a provider you have a key for.
+
+### Shell completion
+
+Tab-completion for all subcommands, flags, model aliases, effort levels, and prompt names (including your user prompts):
+
+```bash
+# zsh
+review completion zsh > ~/.zfunc/_review
+# make sure ~/.zfunc is on fpath (in .zshrc):
+#   fpath=(~/.zfunc $fpath)
+#   autoload -Uz compinit && compinit
+
+# bash
+review completion bash > ~/.bash_completion.d/review
+echo 'source ~/.bash_completion.d/review' >> ~/.bashrc
+
+# fish
+review completion fish > ~/.config/fish/completions/review.fish
+```
+
+Reload the shell and Tab-completion works. The script includes install instructions at the top.
+
+### Scripted init (Dockerfiles / CI)
+
+For non-interactive setup in containers, CI, or dotfile managers:
+
+```bash
+# From an env var
+review init --provider anthropic --key "$ANTHROPIC_API_KEY" --default-model claude-opus --yes
+
+# From stdin (recommended for long keys — no shell history, no buffer truncation)
+echo -n "$KEY" | review init --provider openrouter --key - --default-model anthropic/claude-3.5-sonnet --yes
+
+# From a file
+review init --provider openai --key @/run/secrets/openai_key --default-model gpt-5.4 --yes
+```
 
 ### Reliability
 
