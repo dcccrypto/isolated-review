@@ -1,4 +1,4 @@
-import { createInterface, type Interface } from 'node:readline/promises';
+import { input } from '@inquirer/prompts';
 import { loadConfig, loadKeys, saveConfig, getConfigPath } from '../utils/config.js';
 import { resolveModel, listAliases } from '../providers/resolve.js';
 import { createTheme, type Theme } from '../utils/theme.js';
@@ -21,7 +21,7 @@ export function warnIfKeyMissing(model: string, t: Theme): string | null {
   return null;
 }
 
-export async function promptForDefaultModel(rl: Interface, t: Theme): Promise<string | null | undefined> {
+export async function promptForDefaultModel(t: Theme): Promise<string | null | undefined> {
   const current = loadConfig();
   console.log('');
   console.log(` ${t.header('Default model')}  ${t.muted('· used when --model is omitted')}`);
@@ -32,11 +32,11 @@ export async function promptForDefaultModel(rl: Interface, t: Theme): Promise<st
   for (const a of listAliases()) {
     console.log(`   ${t.muted(a.alias.padEnd(14))} → ${a.model}`);
   }
-  console.log(` ${t.dim('Or a direct name (claude-opus-4-7, gpt-5, o3-mini) or a vendor/model via OpenRouter (anthropic/claude-3.5-sonnet).')}`);
+  console.log(` ${t.dim('Or a direct name (claude-opus-4-7, gpt-5.4, o3-mini) or a vendor/model via OpenRouter (anthropic/claude-3.5-sonnet).')}`);
   console.log(` ${t.dim('Leave blank to keep the current value. Type "-" to clear.')}`);
   console.log('');
 
-  const raw = (await rl.question(' Default model: ')).trim();
+  const raw = (await input({ message: 'Default model:' })).trim();
   if (!raw) return undefined;
   if (raw === '-') return null;
   if (/\s/.test(raw) || raw.startsWith('--')) {
@@ -54,13 +54,7 @@ export function applyDefaultModel(value: string | null | undefined): { changed: 
 
 export async function runSettings(): Promise<string> {
   const t = createTheme();
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  let choice: string | null | undefined;
-  try {
-    choice = await promptForDefaultModel(rl, t);
-  } finally {
-    rl.close();
-  }
+  const choice = await promptForDefaultModel(t);
   const { changed, after } = applyDefaultModel(choice);
   if (!changed) return `\n ${t.muted('No changes.')}\n`;
   const label = after ?? t.dim('(cleared)');

@@ -11,13 +11,17 @@ const program = new Command();
 program
   .name('review')
   .description('Deep code review of a single file in isolation')
-  .version('0.5.0');
+  .version('0.5.1');
 
 function wrap(fn: () => Promise<string>) {
   return async () => {
     try {
       process.stdout.write(await fn());
     } catch (e) {
+      if (e instanceof Error && e.name === 'ExitPromptError') {
+        console.error('cancelled.');
+        process.exit(130);
+      }
       console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
       process.exit(1);
     }

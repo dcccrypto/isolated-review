@@ -1,4 +1,3 @@
-import { createInterface } from 'node:readline/promises';
 import { createTheme } from '../utils/theme.js';
 import { getConfigPath } from '../utils/config.js';
 import { promptForKeys, applyKeyPatch } from './keys.js';
@@ -6,20 +5,14 @@ import { promptForDefaultModel, applyDefaultModel, warnIfKeyMissing } from './se
 
 export async function runInit(): Promise<string> {
   const t = createTheme();
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  console.log('');
+  console.log(` ${t.header('review init')}  ${t.muted('· one-shot setup (keys + default model)')}`);
 
-  let keysPatch, modelChoice;
-  try {
-    console.log('');
-    console.log(` ${t.header('review init')}  ${t.muted('· one-shot setup (keys + default model)')}`);
-    keysPatch = await promptForKeys(rl, t);
-    modelChoice = await promptForDefaultModel(rl, t);
-  } finally {
-    rl.close();
-  }
+  const keysPatch    = await promptForKeys(t);
+  const modelChoice  = await promptForDefaultModel(t);
 
-  const keysResult  = applyKeyPatch(keysPatch);
-  const modelResult = applyDefaultModel(modelChoice);
+  const keysResult   = applyKeyPatch(keysPatch);
+  const modelResult  = applyDefaultModel(modelChoice);
 
   const lines: string[] = [''];
   if (keysResult.changed)  lines.push(` ${t.ok(t.sym.check)} Keys updated`);
@@ -31,7 +24,7 @@ export async function runInit(): Promise<string> {
     const warn = warnIfKeyMissing(modelResult.after, t);
     if (warn) lines.push('', warn);
   }
-  lines.push('', ` ${t.dim('Next: run')} ${t.accent('review <file>')} ${t.dim('to try it out.')}`);
+  lines.push('', ` ${t.dim('Next: run')} ${t.accent('review <file>')} ${t.dim('(or')} ${t.accent('review --pick')}${t.dim(') to try it out.')}`);
   lines.push('');
   return lines.join('\n');
 }

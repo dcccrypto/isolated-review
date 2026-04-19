@@ -1,4 +1,4 @@
-import { createInterface, type Interface } from 'node:readline/promises';
+import { password } from '@inquirer/prompts';
 import { loadKeys, saveKeys, getConfigPath, type Keys } from '../utils/config.js';
 import { createTheme, type Theme } from '../utils/theme.js';
 
@@ -8,7 +8,7 @@ function mask(v: string | undefined): string {
   return `${v.slice(0, 4)}…${v.slice(-4)}`;
 }
 
-export async function promptForKeys(rl: Interface, t: Theme): Promise<Keys> {
+export async function promptForKeys(t: Theme): Promise<Keys> {
   const existing = loadKeys();
   console.log('');
   console.log(` ${t.header('API keys')}  ${t.muted('· one key per provider you plan to use')}`);
@@ -17,12 +17,12 @@ export async function promptForKeys(rl: Interface, t: Theme): Promise<Keys> {
   console.log(` ${t.muted('OpenAI     ')}${mask(existing.openai)}   ${t.dim('platform.openai.com/api-keys')}`);
   console.log(` ${t.muted('OpenRouter ')}${mask(existing.openrouter)}   ${t.dim('openrouter.ai/keys  (one key unlocks many models)')}`);
   console.log(' ' + t.muted(t.rule()));
-  console.log(` ${t.dim('Leave blank to keep the current value. Type "-" to clear.')}`);
+  console.log(` ${t.dim('Input is hidden as you paste. Leave blank to keep current. Type "-" to clear.')}`);
   console.log('');
 
-  const a = (await rl.question(' Anthropic API key:  ')).trim();
-  const o = (await rl.question(' OpenAI API key:     ')).trim();
-  const r = (await rl.question(' OpenRouter API key: ')).trim();
+  const a = (await password({ message: 'Anthropic API key:',  mask: '*' })).trim();
+  const o = (await password({ message: 'OpenAI API key:',     mask: '*' })).trim();
+  const r = (await password({ message: 'OpenRouter API key:', mask: '*' })).trim();
 
   const patch: Keys = {};
   if (a === '-') patch.anthropic  = undefined; else if (a) patch.anthropic  = a;
@@ -50,13 +50,7 @@ export function applyKeyPatch(patch: Keys): { changed: boolean } {
 
 export async function runKeysSetup(): Promise<string> {
   const t = createTheme();
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  let patch: Keys;
-  try {
-    patch = await promptForKeys(rl, t);
-  } finally {
-    rl.close();
-  }
+  const patch = await promptForKeys(t);
   const { changed } = applyKeyPatch(patch);
   if (!changed) return `\n ${t.muted('No changes.')}\n`;
   return `\n ${t.ok(t.sym.check)} Saved to ${t.accent(getConfigPath())} ${t.muted('(chmod 600)')}\n`;
