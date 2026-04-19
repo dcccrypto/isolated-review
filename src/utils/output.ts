@@ -3,8 +3,19 @@ import { createTheme, type Theme } from './theme.js';
 import { basename } from 'node:path';
 import { estimateCost, formatTokens, formatUsd } from './pricing.js';
 
-export function renderJson(result: ReviewResult): string {
-  return JSON.stringify(result, null, 2);
+export interface JsonEnvelope {
+  schemaVersion: 1;
+  file: string;
+  model: string;
+  verifierModel?: string;
+  elapsedMs: number;
+  usage?: Usage;
+  estimatedCostUsd?: number;
+  result: ReviewResult;
+}
+
+export function renderJson(payload: ReviewResult | JsonEnvelope): string {
+  return JSON.stringify(payload, null, 2);
 }
 
 export interface RenderArgs {
@@ -32,12 +43,18 @@ function countBy(findings: Finding[]) {
   };
 }
 
-function locationLabel(filePath: string, f: Finding): string | null {
+function hyperlink(url: string, text: string): string {
+  return `\x1b]8;;${url}\x1b\\${text}\x1b]8;;\x1b\\`;
+}
+
+function locationLabel(filePath: string, f: Finding, t: Theme): string | null {
   if (!f.location) return null;
   const name = basename(filePath);
   const { startLine, endLine } = f.location;
   const range = endLine && endLine !== startLine ? `${startLine}-${endLine}` : `${startLine}`;
-  return `${name}:${range}`;
+  const label = `${name}:${range}`;
+  if (t.plain) return label;
+  return hyperlink(`file://${encodeURI(filePath)}#L${startLine}`, label);
 }
 
 function renderFinding(filePath: string, f: Finding, t: Theme): string {
@@ -45,7 +62,7 @@ function renderFinding(filePath: string, f: Finding, t: Theme): string {
   const color = t[f.severity];
   const tag = f.category ? `  ${t.muted('[' + f.category + ']')}` : '';
   const head = `  ${color(sym)} ${t.header(f.title)}${tag}`;
-  const loc = locationLabel(filePath, f);
+  const loc = locationLabel(filePath, f, t);
   const locLine = loc ? `\n     ${t.muted(loc)}` : '';
   const snip = f.snippet ? `\n     ${t.muted(f.snippet)}` : '';
   const body = `\n     ${f.explanation}`;

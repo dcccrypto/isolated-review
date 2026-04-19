@@ -140,11 +140,11 @@ describe('runReview', () => {
     rmSync(file.dir, { recursive: true });
   });
 
-  it('emits stable JSON for --json and returns verified result when verifier ran', async () => {
+  it('emits a JSON envelope (schemaVersion + model + usage + result) and uses the verified result when verifier ran', async () => {
     const primary: ReviewResult = { summary: 'p', findings: [] };
     const refined: ReviewResult = { summary: 'r', findings: [] };
-    anthropicReview.mockResolvedValue(resp(primary));
-    openaiVerify.mockResolvedValue(resp(refined));
+    anthropicReview.mockResolvedValue(resp(primary, { inputTokens: 100, outputTokens: 50 }));
+    openaiVerify.mockResolvedValue(resp(refined, { inputTokens: 40, outputTokens: 20 }));
 
     const { runReview } = await import('../src/commands/review.js');
     const file = makeFile();
@@ -152,8 +152,14 @@ describe('runReview', () => {
       model: 'claude', verify: 'gpt-4o', patch: false, json: true, plain: false
     });
 
-    expect(() => JSON.parse(out)).not.toThrow();
-    expect(JSON.parse(out)).toEqual(refined);
+    const parsed = JSON.parse(out);
+    expect(parsed.schemaVersion).toBe(1);
+    expect(parsed.model).toBe('claude-sonnet-4-6');
+    expect(parsed.verifierModel).toBe('gpt-4o');
+    expect(parsed.result).toEqual(refined);
+    expect(parsed.usage).toEqual({ inputTokens: 40, outputTokens: 20, cachedInputTokens: undefined });
+    expect(parsed.file).toBe(file.path);
+    expect(typeof parsed.elapsedMs).toBe('number');
     rmSync(file.dir, { recursive: true });
   });
 

@@ -244,9 +244,30 @@ Resolution order: `--model` flag → `defaultModel` from settings → `claude` (
 
 ## Output modes
 
-- **Pretty** (default, TTY): titled header, summary, findings grouped by severity, exact file:line range under each finding, elapsed-time footer.
-- **`--plain`**: same layout, ASCII only, no color — safe for logs and CI.
-- **`--json`**: the raw `ReviewResult` object. Stable keys; pipe it into `jq` or another reviewer.
+- **Pretty** (default, TTY): titled header, summary, findings grouped by severity, exact `file:line` range under each finding (click-through in iTerm / kitty / wezterm / VS Code terminal via OSC 8 hyperlinks), elapsed-time footer with token + cost breakdown. Live token-count + elapsed-seconds ticker during generation so long reviews don't feel frozen.
+- **`--plain`**: same layout, ASCII only, no color, no hyperlinks — safe for logs and CI.
+- **`--json`**: a versioned envelope wrapping the findings. Stable schema, pipe it into `jq` or any tool.
+
+### JSON envelope shape
+
+```json
+{
+  "schemaVersion": 1,
+  "file": "/abs/path/src/foo.ts",
+  "model": "claude-opus-4-7",
+  "verifierModel": "gpt-4o",
+  "elapsedMs": 4231,
+  "usage": { "inputTokens": 2847, "outputTokens": 893, "cachedInputTokens": 1200 },
+  "estimatedCostUsd": 0.104,
+  "result": {
+    "summary": "…",
+    "findings": [ /* Finding[] */ ],
+    "notes": "…"
+  }
+}
+```
+
+`schemaVersion` will never change silently — a future breaking change bumps it.
 
 ## How the review is shaped
 
@@ -268,6 +289,11 @@ Each finding gets a **category** tag alongside severity — one of `correctness`
 ```
 
 When `--verify` is set, the second model gets the original file and the first review, and is told to drop weak findings, strengthen valid ones, and only add something genuinely missed.
+
+### Reliability
+
+- **Streaming** — the CLI streams the model's response token-by-token. You see live progress (`3.2kB · 7.4s`) instead of a frozen spinner, even on 20-second reviews.
+- **Retry with backoff** — transient failures (HTTP 429 / 500 / 502 / 503 / 504 / network resets, overloaded-provider messages) are retried automatically with a 1s → 3s backoff. Auth errors and 4xx validation errors fail fast.
 
 ## What gets sent where
 

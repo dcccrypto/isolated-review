@@ -45,8 +45,10 @@ export interface ReviewResponse {
   usage?: Usage;
 }
 
+export type OnToken = (text: string) => void;
+
 export interface Provider {
   name: 'anthropic' | 'openai' | 'openrouter';
-  review(model: string, input: ReviewInput): Promise<ReviewResponse>;
-  verify(model: string, input: ReviewInput, prior: ReviewResult): Promise<ReviewResponse>;
+  review(model: string, input: ReviewInput, onToken?: OnToken): Promise<ReviewResponse>;
+  verify(model: string, input: ReviewInput, prior: ReviewResult, onToken?: OnToken): Promise<ReviewResponse>;
 }
