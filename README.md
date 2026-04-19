@@ -65,7 +65,7 @@ Resolution order:
 2. **Config file** `~/.config/isolated-review/config.json`, `chmod 600`, written by `review init` / `review keys`.
 3. Override the location with `IR_CONFIG_DIR` if you need to.
 
-Missing keys produce a clean error pointing you at `review keys`. Keys are never logged.
+Missing keys produce a clean error pointing you at `review keys`. Keys are **hidden as you paste them** in `review init` / `review keys` (rendered as `*`), and never echoed or logged.
 
 ## Usage
 
