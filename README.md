@@ -67,6 +67,22 @@ Resolution order:
 
 Missing keys produce a clean error pointing you at `review keys`. Keys are **hidden as you paste them** in `review init` / `review keys` (rendered as `*`), and never echoed or logged.
 
+### Paste-immune key entry
+
+If a very long key truncates on paste (some terminals do this), bypass the interactive prompt entirely:
+
+```bash
+# From a variable (recommended — nothing ends up in shell history):
+read -s ANTH_KEY                                          # silent prompt, paste here
+printf %s "$ANTH_KEY" | review keys --provider anthropic --from-stdin
+unset ANTH_KEY
+
+# From a file:
+review keys --provider openrouter --from-file ~/or-key.txt
+```
+
+After every save the CLI echoes a fingerprint (`len=108 sk-a…NeAA`) so you can instantly confirm the saved value matches what you pasted.
+
 ### Verifying the install
 
 Every release is published from a pinned GitHub Actions workflow with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) — a sigstore-backed attestation tying each tarball to the commit that built it. After installing, you can verify it yourself:
@@ -106,7 +122,9 @@ review ./src/file.rs --patch
 | `--verify <name>` | Optional second-pass verifier model. |
 | `--notes "<text>"` | Extra context the reviewer should consider. |
 | `--patch` | Ask the reviewer to include suggested patches (unified diff). |
-| `--diff [base]` | Review only lines changed vs a git base (default: `HEAD`). Great for PR workflows. |
+| `--diff [base]` | Review only lines changed vs a git base (default: `HEAD`). Great for PR workflows. Falls back to a full-file review with a stderr note for untracked files. |
+| `--prompt <name>` | Use a named prompt preset. Run `review prompts` to see the full list. Default: `default`. |
+| `--prompt-file <path>` | Use the system prompt from an ad-hoc file (no need to install it into the config dir). Mutually exclusive with `--prompt`. |
 | `--json` | Emit machine-readable JSON (stable keys, no spinner, pipe into `jq`). |
 | `--plain` | Disable color and unicode formatting (ASCII only). |
 
@@ -239,6 +257,16 @@ The file is sent to the model with line numbers prepended (`  42 | <code>`) and 
 - an empty `findings` array is a valid, good review when the file is clean,
 - severity is defined concretely: `critical` = bug/security/crash in a realistic path, `medium` = concrete maintainability or correctness risk, `low` = localised nit with a clear fix.
 
+Each finding gets a **category** tag alongside severity — one of `correctness`, `security`, `performance`, `maintainability`, or `style`. The pretty renderer shows it inline:
+
+```
+  ● Off-by-one allows index out of bounds  [correctness]
+    src/foo.ts:42-48
+    for (let i = 0; i <= arr.length; i++) { use(arr[i]); }
+    Loop runs one past the last index, dereferencing arr[arr.length]…
+    Fix — Change `<=` to `<`, or iterate with `for (const x of arr)`.
+```
+
 When `--verify` is set, the second model gets the original file and the first review, and is told to drop weak findings, strengthen valid ones, and only add something genuinely missed.
 
 ## What gets sent where
@@ -247,6 +275,19 @@ When `--verify` is set, the second model gets the original file and the first re
 - **The file you review** is sent to the provider you selected (Anthropic, OpenAI, or OpenRouter), verbatim, with line numbers prepended. If the file contains anything sensitive (credentials, internal identifiers, PII), consider whether you want that provider to see it.
 - **Prompts are cached** on Anthropic via `cache_control: ephemeral` on the system block — repeat runs within ~5 minutes hit the cache and cost ~90% less on the system prompt. OpenAI applies its own automatic prompt caching on longer prompts. OpenRouter passes caching through where the upstream model supports it.
 - **Nothing is logged or phoned home** by this CLI itself — output goes to your terminal, exit code is all.
+
+## Troubleshooting
+
+| Symptom | Likely cause / fix |
+|---|---|
+| `401 invalid x-api-key` | Key revoked, truncated on paste, or wrong workspace. Rotate and resave via `--from-stdin`. Check the fingerprint length matches what you expect (~108 chars for Anthropic, ~164 for OpenAI). |
+| `no <provider> API key found` | Run `review keys` and add a key for that provider. |
+| `unknown model: …` | Use an alias (`claude`, `claude-opus`, etc.), a recognised prefix (`claude-*`, `gpt-*`, `o[134]-*`), or `vendor/model` for OpenRouter. |
+| `--diff requires a git repository` | `cd` into a git-tracked directory. |
+| `no changes vs <base>` | The file has no diff against `<base>`. Omit `--diff` for a full review, or pick a different base. |
+| `--pick needs an interactive terminal` | You're piping / in CI — pass the file path directly instead. |
+| Paste truncated a key | Use `review keys --provider <name> --from-stdin` to bypass the masked paste entirely. |
+| Want to see current config at a glance | `review status` — shows every key's fingerprint, default model, and available prompts. |
 
 ## What this tool won't do
 
