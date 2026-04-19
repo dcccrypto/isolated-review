@@ -9,7 +9,7 @@ import { renderJson, renderPretty, type JsonEnvelope } from '../utils/output.js'
 import { loadConfig } from '../utils/config.js';
 import { getChangedLineRanges, isTracked } from '../utils/diff.js';
 import { estimateCost } from '../utils/pricing.js';
-import type { Provider, ReviewInput, ReviewResponse, OnToken } from '../providers/types.js';
+import type { Provider, ReviewInput, ReviewResponse, OnToken, Effort } from '../providers/types.js';
 
 const providers: Record<Provider['name'], Provider> = {
   anthropic:  anthropicProvider,
@@ -27,6 +27,7 @@ export interface ReviewOpts {
   diff?: string;
   prompt?: string;
   promptFile?: string;
+  effort?: Effort;
 }
 
 function formatBytes(n: number): string {
@@ -85,7 +86,8 @@ export async function runReview(filePath: string, opts: ReviewOpts): Promise<str
     includePatch: opts.patch,
     focusRanges,
     promptName: opts.prompt,
-    promptFile: opts.promptFile
+    promptFile: opts.promptFile,
+    effort: opts.effort
   };
 
   const started = Date.now();
@@ -128,6 +130,7 @@ export async function runReview(filePath: string, opts: ReviewOpts): Promise<str
       file: file.absolutePath,
       model: primary.model,
       verifierModel: verifierModelName,
+      effort: opts.effort,
       elapsedMs,
       usage: finalResp.usage,
       estimatedCostUsd: estimateCost(verifiedResponse ? (verifierModelName ?? primary.model) : primary.model, finalResp.usage) ?? undefined,
@@ -146,6 +149,7 @@ export async function runReview(filePath: string, opts: ReviewOpts): Promise<str
     elapsedMs,
     includePatch: opts.patch,
     diffBase,
+    effort: opts.effort,
     theme,
     primaryUsage: primaryResponse.usage,
     verifierUsage: verifiedResponse?.usage

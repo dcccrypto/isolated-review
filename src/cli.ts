@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { runReview, type ReviewOpts } from './commands/review.js';
+import { EFFORT_LEVELS, type Effort } from './providers/types.js';
 import { runKeysSetup } from './commands/keys.js';
 import { runSettings } from './commands/settings.js';
 import { runInit } from './commands/init.js';
@@ -14,7 +15,7 @@ const program = new Command();
 program
   .name('review')
   .description('Deep code review of a single file in isolation')
-  .version('0.8.0');
+  .version('0.9.0');
 
 function wrap(fn: () => Promise<string>) {
   return async () => {
@@ -117,17 +118,26 @@ program
   .option('--notes <text>',      'extra context for the reviewer')
   .option('--patch',             'ask for suggested patch/diff ideas', false)
   .option('--diff [base]',       'review only lines changed vs a git base (default: HEAD)')
+  .option('--effort <level>',    `reasoning effort: ${EFFORT_LEVELS.join(' | ')}. Claude 4.x maps to extended thinking budget; GPT-5.x / o-series maps to reasoning_effort; OpenRouter passes through.`)
   .option('--prompt <name>',     'use a named prompt preset (run "review prompts" to list)', 'default')
   .option('--prompt-file <path>','use the system prompt from an ad-hoc file (mutually exclusive with --prompt)')
   .option('--json',              'emit machine-readable JSON', false)
   .option('--plain',             'disable color and unicode formatting', false)
-  .action(async (file: string | undefined, rawOpts: Omit<ReviewOpts, 'diff'> & { diff?: string | boolean; pick?: boolean }) => {
+  .action(async (file: string | undefined, rawOpts: Omit<ReviewOpts, 'diff' | 'effort'> & { diff?: string | boolean; pick?: boolean; effort?: string }) => {
     const d = rawOpts.diff;
     const diff: string | undefined =
       d === undefined || d === false ? undefined
       : d === true ? 'HEAD'
       : d;
-    const opts: ReviewOpts = { ...rawOpts, diff };
+    let effort: Effort | undefined;
+    if (rawOpts.effort !== undefined) {
+      if (!(EFFORT_LEVELS as readonly string[]).includes(rawOpts.effort)) {
+        console.error(`error: invalid --effort value "${rawOpts.effort}". valid: ${EFFORT_LEVELS.join(', ')}`);
+        process.exit(1);
+      }
+      effort = rawOpts.effort as Effort;
+    }
+    const opts: ReviewOpts = { ...rawOpts, diff, effort };
     try {
       let target = file;
       if (!target && rawOpts.pick) {

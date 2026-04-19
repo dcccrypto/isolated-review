@@ -87,6 +87,28 @@ describe('openrouterProvider', () => {
     expect(result.summary).toBe('fenced');
   });
 
+  it('passes reasoning.effort through for OpenRouter models', async () => {
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: '{"summary":"s","findings":[]}' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 5 }
+    });
+
+    const { openrouterProvider } = await import('../src/providers/openrouter.js');
+    await openrouterProvider.review('anthropic/claude-3.5-sonnet', { ...input, effort: 'high' });
+    expect(mockCreate.mock.calls[0]![0].reasoning).toEqual({ effort: 'high' });
+  });
+
+  it('does not set reasoning when effort is undefined', async () => {
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: '{"summary":"s","findings":[]}' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 5 }
+    });
+
+    const { openrouterProvider } = await import('../src/providers/openrouter.js');
+    await openrouterProvider.review('openai/gpt-4o', input);
+    expect(mockCreate.mock.calls[0]![0].reasoning).toBeUndefined();
+  });
+
   it('throws descriptive error for non-JSON output', async () => {
     mockCreate.mockResolvedValue({ choices: [{ message: { content: 'not json' } }] });
     const { openrouterProvider } = await import('../src/providers/openrouter.js');

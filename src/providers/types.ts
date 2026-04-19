@@ -23,6 +23,9 @@ export interface ReviewResult {
   notes?: string;
 }
 
+export type Effort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+export const EFFORT_LEVELS: readonly Effort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'];
+
 export interface ReviewInput {
   filePath: string;
   language: string;
@@ -32,6 +35,7 @@ export interface ReviewInput {
   focusRanges?: Location[];
   promptName?: string;
   promptFile?: string;
+  effort?: Effort;
 }
 
 export interface Usage {

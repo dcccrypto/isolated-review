@@ -1,4 +1,4 @@
-import type { ReviewResult, Finding, Severity, Usage } from '../providers/types.js';
+import type { ReviewResult, Finding, Severity, Usage, Effort } from '../providers/types.js';
 import { createTheme, type Theme } from './theme.js';
 import { basename } from 'node:path';
 import { estimateCost, formatTokens, formatUsd } from './pricing.js';
@@ -8,6 +8,7 @@ export interface JsonEnvelope {
   file: string;
   model: string;
   verifierModel?: string;
+  effort?: Effort;
   elapsedMs: number;
   usage?: Usage;
   estimatedCostUsd?: number;
@@ -27,6 +28,7 @@ export interface RenderArgs {
   elapsedMs: number;
   includePatch: boolean;
   diffBase?: string;
+  effort?: Effort;
   theme: Theme;
   primaryUsage?: Usage;
   verifierUsage?: Usage;
@@ -103,6 +105,7 @@ export function renderPretty(args: RenderArgs): string {
     topRule,
     kv('Model', primaryModel),
     verifierModel ? kv('Verifier', verifierModel) : null,
+    args.effort  ? kv('Effort',   args.effort) : null,
     modes.length ? kv('Mode', modes.join(', ')) : null
   ].filter((l): l is string => l !== null);
   const header = headerLines.join('\n');

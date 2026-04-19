@@ -123,6 +123,7 @@ review ./src/file.rs --patch
 | `--notes "<text>"` | Extra context the reviewer should consider. |
 | `--patch` | Ask the reviewer to include suggested patches (unified diff). |
 | `--diff [base]` | Review only lines changed vs a git base (default: `HEAD`). Great for PR workflows. Falls back to a full-file review with a stderr note for untracked files. |
+| `--effort <level>` | Reasoning effort: `none` / `minimal` / `low` / `medium` / `high` / `xhigh`. Maps to Anthropic extended thinking, OpenAI `reasoning_effort`, or OpenRouter `reasoning.effort`. See "Reasoning effort" below. |
 | `--prompt <name>` | Use a named prompt preset. Run `review prompts` to see the full list. Default: `default`. |
 | `--prompt-file <path>` | Use the system prompt from an ad-hoc file (no need to install it into the config dir). Mutually exclusive with `--prompt`. |
 | `--json` | Emit machine-readable JSON (stable keys, no spinner, pipe into `jq`). |
@@ -289,6 +290,35 @@ Each finding gets a **category** tag alongside severity — one of `correctness`
 ```
 
 When `--verify` is set, the second model gets the original file and the first review, and is told to drop weak findings, strengthen valid ones, and only add something genuinely missed.
+
+### Reasoning effort
+
+Most 2025/2026-era frontier models expose a "think harder" dial. `--effort <level>` maps to each provider's native parameter:
+
+```bash
+review src/tricky.ts --model claude-opus-4-7 --effort high      # ~16k thinking tokens
+review src/tricky.ts --model claude-opus-4-7 --effort xhigh     # ~32k thinking tokens
+review src/tricky.ts --model gpt-5.4          --effort high     # reasoning_effort: high
+review src/tricky.ts --model gpt-5.4          --effort xhigh    # reasoning_effort: xhigh  (5.2+)
+review src/tricky.ts --model o3-mini          --effort high     # reasoning_effort: high
+review src/tricky.ts --model anthropic/claude-3.5-sonnet --effort high  # OpenRouter reasoning.effort
+```
+
+**How each provider interprets it:**
+
+| Level | Anthropic Claude 4.x | OpenAI GPT-5 / o-series | OpenRouter |
+|---|---|---|---|
+| `none` | thinking disabled (same as not passing) | `reasoning_effort: none` (GPT-5.2+) | `reasoning.effort: none` |
+| `minimal` | thinking disabled | `reasoning_effort: minimal` (older GPT-5) | pass-through |
+| `low` | `thinking.budget_tokens: 2048` | `reasoning_effort: low` | pass-through |
+| `medium` | `thinking.budget_tokens: 8192` | `reasoning_effort: medium` | pass-through |
+| `high` | `thinking.budget_tokens: 16384` | `reasoning_effort: high` | pass-through |
+| `xhigh` | `thinking.budget_tokens: 32768` | `reasoning_effort: xhigh` (GPT-5.2+) | pass-through |
+
+Notes:
+- Extended thinking and `reasoning_effort` both **increase cost** (thinking tokens are billed as output). Start with `medium` when in doubt.
+- Claude Haiku and non-reasoning OpenAI models (`gpt-4o` family) don't support the dial — `--effort` is silently ignored for them.
+- Not every OpenAI model accepts every level. `xhigh` and `none` exist only on GPT-5.2+. `minimal` is older-GPT-5 only. o-series accepts `low | medium | high`. If the API rejects the level, you'll get a clean 400 — pick a level the model supports.
 
 ### Reliability
 

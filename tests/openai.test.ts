@@ -89,6 +89,36 @@ describe('openaiProvider', () => {
       .rejects.toThrow(/openai: model returned non-JSON output[\s\S]*not json/);
   });
 
+  it('passes reasoning_effort through for GPT-5 and o-series, verbatim', async () => {
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: '{"summary":"s","findings":[]}' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 5 }
+    });
+
+    const { openaiProvider } = await import('../src/providers/openai.js');
+    await openaiProvider.review('gpt-5.4', { ...input, effort: 'xhigh' });
+    expect(mockCreate.mock.calls[0]![0].reasoning_effort).toBe('xhigh');
+
+    mockCreate.mockClear();
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: '{"summary":"s","findings":[]}' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 5 }
+    });
+    await openaiProvider.review('o3-mini', { ...input, effort: 'high' });
+    expect(mockCreate.mock.calls[0]![0].reasoning_effort).toBe('high');
+  });
+
+  it('does NOT pass reasoning_effort to non-reasoning models (gpt-4o)', async () => {
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: '{"summary":"s","findings":[]}' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 5 }
+    });
+
+    const { openaiProvider } = await import('../src/providers/openai.js');
+    await openaiProvider.review('gpt-4o', { ...input, effort: 'high' });
+    expect(mockCreate.mock.calls[0]![0].reasoning_effort).toBeUndefined();
+  });
+
   it('throws a labeled empty-response error when message.content is missing', async () => {
     mockCreate.mockResolvedValue({ choices: [{ message: {} }] });
 

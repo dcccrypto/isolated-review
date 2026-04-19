@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { Provider, ReviewResponse, Usage, OnToken } from './types.js';
+import type { Provider, ReviewResponse, Usage, OnToken, Effort } from './types.js';
 import { buildReviewMessages } from '../prompts/reviewPrompt.js';
 import { buildVerifyMessages } from '../prompts/verifyPrompt.js';
 import { loadKeys } from '../utils/config.js';
@@ -21,13 +21,38 @@ function usageFrom(u: Anthropic.Messages.Usage): Usage {
   };
 }
 
-async function call(model: string, system: string, user: string, onToken?: OnToken): Promise<ReviewResponse> {
-  const params = {
+// Anthropic 'thinking' takes a raw budget_tokens count (1024–32768 per docs).
+// Level → budget mapping; 'none' and 'minimal' both disable thinking.
+const THINKING_BUDGET: Record<Effort, number> = {
+  none:    0,
+  minimal: 0,
+  low:     2048,
+  medium:  8192,
+  high:    16384,
+  xhigh:   32768
+};
+
+function supportsThinking(model: string): boolean {
+  return /claude-(opus|sonnet)-4/.test(model);
+}
+
+function buildParams(model: string, system: string, user: string, effort?: Effort) {
+  const baseMax = 4096;
+  const budget = effort && supportsThinking(model) ? THINKING_BUDGET[effort] : 0;
+  const params: Anthropic.Messages.MessageCreateParamsNonStreaming = {
     model,
-    max_tokens: 4096,
+    max_tokens: baseMax + budget,
     system: [{ type: 'text' as const, text: system, cache_control: { type: 'ephemeral' as const } }],
     messages: [{ role: 'user' as const, content: user }]
   };
+  if (budget > 0) {
+    params.thinking = { type: 'enabled', budget_tokens: budget };
+  }
+  return params;
+}
+
+async function call(model: string, system: string, user: string, effort?: Effort, onToken?: OnToken): Promise<ReviewResponse> {
+  const params = buildParams(model, system, user, effort);
 
   if (!onToken) {
     const msg = await withRetry(() => client().messages.create(params));
@@ -49,10 +74,10 @@ export const anthropicProvider: Provider = {
   name: 'anthropic',
   async review(model, input, onToken) {
     const { system, user } = buildReviewMessages(input, input.promptName);
-    return call(model, system, user, onToken);
+    return call(model, system, user, input.effort, onToken);
   },
   async verify(model, input, prior, onToken) {
     const { system, user } = buildVerifyMessages(input, prior);
-    return call(model, system, user, onToken);
+    return call(model, system, user, input.effort, onToken);
   }
 };

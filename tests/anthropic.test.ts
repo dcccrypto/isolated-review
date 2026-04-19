@@ -94,6 +94,51 @@ describe('anthropicProvider', () => {
       .rejects.toThrow(/anthropic: model returned non-JSON output[\s\S]*Here is some prose/);
   });
 
+  it('sets thinking + bumped max_tokens when effort is set on a supported model', async () => {
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: '{"summary":"s","findings":[]}' }],
+      usage: { input_tokens: 100, output_tokens: 50 }
+    });
+
+    const { anthropicProvider } = await import('../src/providers/anthropic.js');
+    await anthropicProvider.review('claude-opus-4-7', { ...input, effort: 'high' });
+
+    const args = mockCreate.mock.calls[0]![0];
+    expect(args.thinking).toEqual({ type: 'enabled', budget_tokens: 16384 });
+    expect(args.max_tokens).toBe(4096 + 16384);
+  });
+
+  it('does NOT set thinking when effort is "none" or "minimal"', async () => {
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: '{"summary":"s","findings":[]}' }],
+      usage: { input_tokens: 100, output_tokens: 50 }
+    });
+
+    const { anthropicProvider } = await import('../src/providers/anthropic.js');
+    await anthropicProvider.review('claude-opus-4-7', { ...input, effort: 'none' });
+    expect(mockCreate.mock.calls[0]![0].thinking).toBeUndefined();
+    expect(mockCreate.mock.calls[0]![0].max_tokens).toBe(4096);
+
+    mockCreate.mockClear();
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: '{"summary":"s","findings":[]}' }],
+      usage: { input_tokens: 10, output_tokens: 5 }
+    });
+    await anthropicProvider.review('claude-opus-4-7', { ...input, effort: 'minimal' });
+    expect(mockCreate.mock.calls[0]![0].thinking).toBeUndefined();
+  });
+
+  it('does NOT set thinking on unsupported models (Haiku, older Claude)', async () => {
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: '{"summary":"s","findings":[]}' }],
+      usage: { input_tokens: 10, output_tokens: 5 }
+    });
+
+    const { anthropicProvider } = await import('../src/providers/anthropic.js');
+    await anthropicProvider.review('claude-haiku-4-5-20251001', { ...input, effort: 'high' });
+    expect(mockCreate.mock.calls[0]![0].thinking).toBeUndefined();
+  });
+
   it('throws a labeled empty-response error when no text block is present', async () => {
     mockCreate.mockResolvedValue({ content: [] });
 
