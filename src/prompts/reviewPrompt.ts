@@ -1,10 +1,12 @@
 import type { ReviewInput } from '../providers/types.js';
 import { withLineNumbers } from './shared.js';
 import { formatRanges } from '../utils/diff.js';
-import { loadPrompt } from './library.js';
+import { loadPrompt, loadPromptFromFile } from './library.js';
 
 export function buildReviewMessages(input: ReviewInput, promptName: string = 'default') {
-  const prompt = loadPrompt(promptName);
+  const prompt = input.promptFile
+    ? loadPromptFromFile(input.promptFile)
+    : loadPrompt(promptName);
   const notes = input.userNotes ? `\n\n## Context from author\n${input.userNotes}` : '';
   const patch = input.includePatch
     ? `\n\nFor each actionable finding, include a unified-diff \`patch\` field when a concrete fix is possible.`

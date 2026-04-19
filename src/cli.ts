@@ -5,19 +5,35 @@ import { runKeysSetup } from './commands/keys.js';
 import { runSettings } from './commands/settings.js';
 import { runInit } from './commands/init.js';
 import { pickFile } from './commands/pick.js';
-import { runListPrompts } from './commands/prompts.js';
+import { runListPrompts, runPromptNew, runPromptEdit, runPromptShow } from './commands/prompts.js';
+import { runStatus } from './commands/status.js';
 
 const program = new Command();
 
 program
   .name('review')
   .description('Deep code review of a single file in isolation')
-  .version('0.6.0');
+  .version('0.7.0');
 
 function wrap(fn: () => Promise<string>) {
   return async () => {
     try {
       process.stdout.write(await fn());
+    } catch (e) {
+      if (e instanceof Error && e.name === 'ExitPromptError') {
+        console.error('cancelled.');
+        process.exit(130);
+      }
+      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+      process.exit(1);
+    }
+  };
+}
+
+function wrapArg<A>(fn: (arg: A) => Promise<string>) {
+  return async (arg: A) => {
+    try {
+      process.stdout.write(await fn(arg));
     } catch (e) {
       if (e instanceof Error && e.name === 'ExitPromptError') {
         console.error('cancelled.');
@@ -60,21 +76,36 @@ program
   .action(wrap(runSettings));
 
 program
+  .command('status')
+  .description('Show current config: keys set, default model, prompts available')
+  .action(wrap(runStatus));
+
+const promptsCmd = program
   .command('prompts')
-  .description('List built-in and user-defined prompt presets')
+  .description('List and manage prompt presets')
   .action(wrap(runListPrompts));
+promptsCmd.command('new <name>')
+  .description('Scaffold a user prompt and open it in $EDITOR')
+  .action(wrapArg(runPromptNew));
+promptsCmd.command('edit <name>')
+  .description('Open an existing user prompt in $EDITOR')
+  .action(wrapArg(runPromptEdit));
+promptsCmd.command('show <name>')
+  .description('Print a prompt to stdout (for inspection/debugging)')
+  .action(wrapArg(runPromptShow));
 
 program
-  .argument('[file]',        'path to the file to review (omit with --pick to choose interactively)')
-  .option('--pick',          'interactively pick a file from the current directory', false)
-  .option('--model <name>',  'primary review model (default: from settings, or "claude")')
-  .option('--verify <name>', 'optional second-pass verifier model')
-  .option('--notes <text>',  'extra context for the reviewer')
-  .option('--patch',         'ask for suggested patch/diff ideas', false)
-  .option('--diff [base]',   'review only lines changed vs a git base (default: HEAD)')
-  .option('--prompt <name>', 'use a named prompt preset (run "review prompts" to list)', 'default')
-  .option('--json',          'emit machine-readable JSON', false)
-  .option('--plain',         'disable color and unicode formatting', false)
+  .argument('[file]',            'path to the file to review (omit with --pick to choose interactively)')
+  .option('--pick',              'interactively pick a file from the current directory', false)
+  .option('--model <name>',      'primary review model (default: from settings, or "claude")')
+  .option('--verify <name>',     'optional second-pass verifier model')
+  .option('--notes <text>',      'extra context for the reviewer')
+  .option('--patch',             'ask for suggested patch/diff ideas', false)
+  .option('--diff [base]',       'review only lines changed vs a git base (default: HEAD)')
+  .option('--prompt <name>',     'use a named prompt preset (run "review prompts" to list)', 'default')
+  .option('--prompt-file <path>','use the system prompt from an ad-hoc file (mutually exclusive with --prompt)')
+  .option('--json',              'emit machine-readable JSON', false)
+  .option('--plain',             'disable color and unicode formatting', false)
   .action(async (file: string | undefined, rawOpts: Omit<ReviewOpts, 'diff'> & { diff?: string | boolean; pick?: boolean }) => {
     const d = rawOpts.diff;
     const diff: string | undefined =
@@ -94,6 +125,10 @@ program
       const output = await runReview(target, opts);
       console.log(output);
     } catch (e) {
+      if (e instanceof Error && e.name === 'ExitPromptError') {
+        console.error('cancelled.');
+        process.exit(130);
+      }
       console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
       process.exit(1);
     }

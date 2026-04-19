@@ -63,3 +63,66 @@ describe('prompt library', () => {
       .toThrow(/unknown prompt: "not-a-thing"[\s\S]*built-in: default, security, perf, refactor/);
   });
 });
+
+describe('loadPromptFromFile', () => {
+  it('loads an ad-hoc prompt from any path and appends the schema', async () => {
+    const { loadPromptFromFile } = await import('../src/prompts/library.js');
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const d = mkdtempSync(join(tmpdir(), 'ir-prompt-'));
+    const path = join(d, 'custom.md');
+    writeFileSync(path, 'You are a custom reviewer. Be terse.');
+    const p = loadPromptFromFile(path);
+    expect(p.source).toBe('user');
+    expect(p.system).toContain('You are a custom reviewer');
+    expect(p.system).toContain('Return ONLY a JSON object');
+  });
+
+  it('throws on missing or empty file', async () => {
+    const { loadPromptFromFile } = await import('../src/prompts/library.js');
+    expect(() => loadPromptFromFile('/no/such/prompt.md')).toThrow(/not found/);
+  });
+});
+
+describe('createUserPrompt', () => {
+  let dir: string;
+  const origEnv = { ...process.env };
+
+  beforeEach(async () => {
+    const { mkdtempSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    dir = mkdtempSync(join(tmpdir(), 'ir-createpr-'));
+    process.env.IR_CONFIG_DIR = dir;
+  });
+
+  afterEach(async () => {
+    const { rmSync } = await import('node:fs');
+    rmSync(dir, { recursive: true, force: true });
+    process.env = { ...origEnv };
+  });
+
+  it('scaffolds a new prompt file with a template body', async () => {
+    const { createUserPrompt } = await import('../src/prompts/library.js');
+    const { readFileSync, existsSync } = await import('node:fs');
+    const path = createUserPrompt('my-review');
+    expect(existsSync(path)).toBe(true);
+    const body = readFileSync(path, 'utf8');
+    expect(body).toMatch(/Describe your reviewer/i);
+    expect(body).toMatch(/Calibration/i);
+  });
+
+  it('rejects invalid names and collisions', async () => {
+    const { createUserPrompt } = await import('../src/prompts/library.js');
+    expect(() => createUserPrompt('has spaces')).toThrow(/invalid prompt name/);
+    expect(() => createUserPrompt('bad/slash')).toThrow(/invalid prompt name/);
+    expect(() => createUserPrompt('default')).toThrow(/collides with a built-in/);
+  });
+
+  it('refuses to overwrite an existing prompt', async () => {
+    const { createUserPrompt } = await import('../src/prompts/library.js');
+    createUserPrompt('once');
+    expect(() => createUserPrompt('once')).toThrow(/already exists/);
+  });
+});

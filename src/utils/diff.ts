@@ -2,6 +2,17 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import type { Location } from '../providers/types.js';
 
+export function isTracked(filePath: string): boolean {
+  try {
+    execFileSync('git', ['ls-files', '--error-unmatch', resolve(filePath)], {
+      stdio: ['ignore', 'ignore', 'ignore']
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function getChangedLineRanges(filePath: string, base: string): Location[] {
   const absolute = resolve(filePath);
   let output: string;

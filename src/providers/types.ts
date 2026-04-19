@@ -31,6 +31,7 @@ export interface ReviewInput {
   includePatch: boolean;
   focusRanges?: Location[];
   promptName?: string;
+  promptFile?: string;
 }
 
 export interface Usage {

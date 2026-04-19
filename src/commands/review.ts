@@ -7,7 +7,7 @@ import { openrouterProvider } from '../providers/openrouter.js';
 import { createTheme } from '../utils/theme.js';
 import { renderJson, renderPretty } from '../utils/output.js';
 import { loadConfig } from '../utils/config.js';
-import { getChangedLineRanges } from '../utils/diff.js';
+import { getChangedLineRanges, isTracked } from '../utils/diff.js';
 import type { Provider, ReviewInput, ReviewResponse } from '../providers/types.js';
 
 const providers: Record<Provider['name'], Provider> = {
@@ -25,9 +25,14 @@ export interface ReviewOpts {
   plain: boolean;
   diff?: string;
   prompt?: string;
+  promptFile?: string;
 }
 
 export async function runReview(filePath: string, opts: ReviewOpts): Promise<string> {
+  if (opts.prompt && opts.promptFile) {
+    throw new Error('--prompt and --prompt-file are mutually exclusive; pick one');
+  }
+
   const file = await readSourceFile(filePath);
   const config = loadConfig();
   const modelName = opts.model ?? config.defaultModel ?? 'claude';
@@ -35,12 +40,19 @@ export async function runReview(filePath: string, opts: ReviewOpts): Promise<str
   const provider = providers[primary.provider];
 
   let focusRanges: ReviewInput['focusRanges'];
+  let diffBase = opts.diff;
   if (opts.diff) {
     const ranges = getChangedLineRanges(file.absolutePath, opts.diff);
     if (ranges.length === 0) {
-      throw new Error(`no changes vs ${opts.diff} in ${file.absolutePath}. omit --diff to review the whole file`);
+      if (!isTracked(file.absolutePath)) {
+        process.stderr.write(`note: ${file.absolutePath} is untracked; reviewing the whole file\n`);
+        diffBase = undefined;
+      } else {
+        throw new Error(`no changes vs ${opts.diff} in ${file.absolutePath}. omit --diff to review the whole file`);
+      }
+    } else {
+      focusRanges = ranges;
     }
-    focusRanges = ranges;
   }
 
   const input: ReviewInput = {
@@ -50,7 +62,8 @@ export async function runReview(filePath: string, opts: ReviewOpts): Promise<str
     userNotes: opts.notes,
     includePatch: opts.patch,
     focusRanges,
-    promptName: opts.prompt
+    promptName: opts.prompt,
+    promptFile: opts.promptFile
   };
 
   const started = Date.now();
@@ -95,7 +108,7 @@ export async function runReview(filePath: string, opts: ReviewOpts): Promise<str
     verified: verifiedResponse?.result,
     elapsedMs: Date.now() - started,
     includePatch: opts.patch,
-    diffBase: opts.diff ?? undefined,
+    diffBase,
     theme,
     primaryUsage: primaryResponse.usage,
     verifierUsage: verifiedResponse?.usage

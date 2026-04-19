@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, basename, extname } from 'node:path';
 import { getConfigDir } from '../utils/config.js';
 import { SCHEMA_INSTRUCTION } from './shared.js';
@@ -153,4 +153,60 @@ export function listAllPrompts(): NamedPrompt[] {
     }
   }
   return all;
+}
+
+export function loadPromptFromFile(path: string): NamedPrompt {
+  if (!existsSync(path)) throw new Error(`prompt file not found: ${path}`);
+  const system = readFileSync(path, 'utf8').trim();
+  if (!system) throw new Error(`prompt file is empty: ${path}`);
+  return {
+    name: basename(path, extname(path)),
+    source: 'user',
+    description: `Ad-hoc prompt from ${path}`,
+    system: `${system}\n\n${SCHEMA_INSTRUCTION}`
+  };
+}
+
+export const USER_PROMPT_TEMPLATE = `# Describe your reviewer in one paragraph.
+# Example: "You are a reviewer for Stripe payment-flow code. Focus on: idempotency
+# keys on every mutating call, signature verification on webhooks, correct
+# handling of 3DS challenge states, and race conditions on customer.update."
+#
+# Delete these comments before saving.
+
+You are a code reviewer focused on <YOUR DOMAIN HERE>.
+
+Focus on:
+- <specific pattern 1>
+- <specific pattern 2>
+- <specific pattern 3>
+
+Skip generic style, naming, and unrelated concerns.
+
+Calibration:
+- Every finding must cite specific lines and quote the tokens it's about.
+- No generic advice. An empty \`findings\` array is a valid review.
+- Severity: "critical" = real exploit or crash. "medium" = concrete risk.
+  "low" = localised nit with an obvious fix. Below that, drop it.
+`;
+
+export function createUserPrompt(name: string): string {
+  if (!/^[a-z0-9][a-z0-9_-]*$/i.test(name)) {
+    throw new Error(`invalid prompt name: "${name}". use letters, digits, hyphens, underscores; no spaces or slashes.`);
+  }
+  if (name in BUILTIN) {
+    throw new Error(`"${name}" collides with a built-in prompt. pick another name.`);
+  }
+  const dir = userPromptsDir();
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const path = join(dir, `${name}.md`);
+  if (existsSync(path)) {
+    throw new Error(`prompt already exists: ${path}. use \`review prompts edit ${name}\` to modify.`);
+  }
+  writeFileSync(path, USER_PROMPT_TEMPLATE, { mode: 0o600 });
+  return path;
+}
+
+export function userPromptPath(name: string): string {
+  return join(userPromptsDir(), `${name}.md`);
 }

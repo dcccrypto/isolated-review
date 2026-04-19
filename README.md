@@ -94,7 +94,8 @@ review ./src/file.rs --patch
 | `review init` | One-shot setup — keys + default model in one walk-through. |
 | `review keys` | Set API keys only. |
 | `review settings` | Set the default review model only. |
-| `review prompts` | List built-in and user-defined prompt presets. |
+| `review status` | Show current config (keys set, default model, prompts). |
+| `review prompts` | List prompt presets. Subcommands: `new <name>`, `edit <name>`, `show <name>`. |
 
 ### Options
 
@@ -122,12 +123,19 @@ review src/foo.ts                        # default = balanced full-spectrum
 
 `review prompts` lists everything available. Built-in: `default`, `security`, `perf`, `refactor`.
 
-You can write your own:
+You can write your own — the easy way:
 
 ```bash
-mkdir -p ~/.config/isolated-review/prompts
-echo "Your custom system prompt here." > ~/.config/isolated-review/prompts/house-style.md
-review src/foo.ts --prompt house-style
+review prompts new anchor-audit    # scaffolds a template and opens $EDITOR
+review src/program.rs --prompt anchor-audit
+review prompts edit anchor-audit   # iterate
+review prompts show anchor-audit   # print it back (handy for debugging)
+```
+
+Or point at a file directly for a one-off (no install into the config dir):
+
+```bash
+review src/foo.ts --prompt-file ./weird-edge-case.md
 ```
 
 The schema instruction is appended automatically — your file just needs the system-prompt body.

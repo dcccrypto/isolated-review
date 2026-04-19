@@ -30,5 +30,6 @@ export async function readSourceFile(path: string) {
 
   const ext = extname(absolutePath).slice(1).toLowerCase();
   const language = EXT_TO_LANG[ext] ?? 'plaintext';
-  return { absolutePath, language, content: buf.toString('utf8') };
+  const content = buf.toString('utf8').replace(/\r\n/g, '\n').replace(/\r(?!\n)/g, '\n');
+  return { absolutePath, language, content };
 }

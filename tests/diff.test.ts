@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getChangedLineRanges, formatRanges } from '../src/utils/diff.js';
+import { getChangedLineRanges, formatRanges, isTracked } from '../src/utils/diff.js';
 
 describe('getChangedLineRanges', () => {
   let repo: string;
@@ -57,5 +57,11 @@ describe('formatRanges', () => {
       { startLine: 10, endLine: 12 },
       { startLine: 20, endLine: 20 }
     ])).toBe('5, 10-12, 20');
+  });
+});
+
+describe('isTracked', () => {
+  it('returns false for a file outside any git repo', () => {
+    expect(isTracked('/tmp/definitely-not-in-git.xyz')).toBe(false);
   });
 });
