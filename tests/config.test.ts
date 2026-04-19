@@ -89,3 +89,48 @@ describe('config', () => {
     expect(loadConfig().openrouter).toBe('or-env');
   });
 });
+
+describe('last-run persistence', () => {
+  let dir: string;
+  const origEnv = { ...process.env };
+
+  beforeEach(async () => {
+    dir = mkdtempSync(join(tmpdir(), 'ir-lastrun-'));
+    process.env.IR_CONFIG_DIR = dir;
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+    process.env = { ...origEnv };
+  });
+
+  it('returns null when no last run is stored', async () => {
+    const { loadLastRun } = await import('../src/utils/config.js');
+    expect(loadLastRun()).toBeNull();
+  });
+
+  it('roundtrips a LastRun record', async () => {
+    const { saveLastRun, loadLastRun } = await import('../src/utils/config.js');
+    saveLastRun({
+      file: '/tmp/foo.ts',
+      model: 'claude-opus',
+      effort: 'high',
+      patch: true,
+      ranAt: '2026-04-19T10:00:00.000Z'
+    });
+    const back = loadLastRun();
+    expect(back).toEqual({
+      file: '/tmp/foo.ts',
+      model: 'claude-opus',
+      effort: 'high',
+      patch: true,
+      ranAt: '2026-04-19T10:00:00.000Z'
+    });
+  });
+
+  it('returns null on a corrupt last-run file', async () => {
+    writeFileSync(join(dir, 'last-run.json'), 'not-json{{{');
+    const { loadLastRun } = await import('../src/utils/config.js');
+    expect(loadLastRun()).toBeNull();
+  });
+});

@@ -40,7 +40,7 @@ export async function setKeyFromInput(
     raw = readFileSync(filePath, 'utf8');
   }
 
-  const value = raw.replace(/[\r\n]+$/g, '').replace(/^[\r\n]+/, '');
+  const value = raw.trim();
   if (!value) throw new Error('input was empty');
 
   const patch: Keys = { [provider]: value } as Keys;

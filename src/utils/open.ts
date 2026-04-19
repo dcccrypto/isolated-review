@@ -30,7 +30,7 @@ export async function openAtLine(filePath: string, line: number): Promise<string
   return `${opener} ${filePath}`;
 }
 
-function editorArgs(editor: string, file: string, line: number): string[] {
+export function editorArgs(editor: string, file: string, line: number): string[] {
   const bin = editor.split(/\s+/)[0]!.toLowerCase();
   const prefix = editor.split(/\s+/);
   // Editors that support `file:line` natively or with a flag

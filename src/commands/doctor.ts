@@ -1,5 +1,5 @@
 import { existsSync, accessSync, constants } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { platform } from 'node:process';
 import { loadConfig, getConfigDir, getConfigPath } from '../utils/config.js';
 import { listAllPrompts } from '../prompts/library.js';
@@ -74,6 +74,22 @@ function defaultModelCheck(c: ReturnType<typeof loadConfig>): Check {
   }
 }
 
+export function commandExists(cmd: string): boolean {
+  // Cross-platform "is this binary on PATH?" — we can't rely on --version
+  // (pbcopy doesn't have it) or `which` (not on Windows). Spawn with empty
+  // stdin and a short timeout; if the binary is missing we get ENOENT.
+  try {
+    const r = spawnSync(cmd, [], {
+      stdio: ['pipe', 'ignore', 'ignore'],
+      input: '',
+      timeout: 1000
+    });
+    return !(r.error && (r.error as NodeJS.ErrnoException).code === 'ENOENT');
+  } catch {
+    return false;
+  }
+}
+
 function clipboardCheck(): Check {
   const candidates =
     platform === 'darwin' ? ['pbcopy'] :
@@ -81,14 +97,8 @@ function clipboardCheck(): Check {
     ['wl-copy', 'xclip', 'xsel'];
 
   for (const cmd of candidates) {
-    try {
-      execFileSync(cmd, ['--version'], { stdio: ['ignore', 'ignore', 'ignore'] });
+    if (commandExists(cmd)) {
       return { label: 'Clipboard backend', status: 'ok', detail: cmd };
-    } catch {
-      try {
-        execFileSync('which', [cmd], { stdio: ['ignore', 'ignore', 'ignore'] });
-        return { label: 'Clipboard backend', status: 'ok', detail: cmd };
-      } catch { /* keep trying */ }
     }
   }
   return {
