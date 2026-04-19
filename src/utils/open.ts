@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
 import { platform } from 'node:process';
+import { existsSync } from 'node:fs';
+import { basename } from 'node:path';
 
 /**
  * Open a file at a given line in the user's preferred editor.
@@ -31,13 +33,17 @@ export async function openAtLine(filePath: string, line: number): Promise<string
 }
 
 export function editorArgs(editor: string, file: string, line: number): string[] {
-  const bin = editor.split(/\s+/)[0]!.toLowerCase();
-  const prefix = editor.split(/\s+/);
+  // If EDITOR is an exact path to an existing file (common for GUI editors
+  // like "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"),
+  // treat it atomically so spaces in the path don't get word-split.
+  const prefix = existsSync(editor) ? [editor] : editor.split(/\s+/).filter(Boolean);
+  if (prefix.length === 0) return [editor, file];
+  const bin = basename(prefix[0]!).toLowerCase();
   // Editors that support `file:line` natively or with a flag
-  if (/vim|nvim|nano/.test(bin)) return [...prefix, `+${line}`, file];
-  if (/^(code|cursor|windsurf)$/.test(bin)) return [...prefix, '--goto', `${file}:${line}`];
+  if (/^(vim|nvim|gvim|mvim|nano)$/.test(bin) || /^vim(diff)?$/.test(bin)) return [...prefix, `+${line}`, file];
+  if (/^(code|cursor|windsurf|code-insiders)$/.test(bin)) return [...prefix, '--goto', `${file}:${line}`];
   if (/^(emacs|emacsclient)$/.test(bin)) return [...prefix, `+${line}`, file];
-  if (/^subl/.test(bin)) return [...prefix, `${file}:${line}`];
+  if (/^subl(ime_text)?$/.test(bin)) return [...prefix, `${file}:${line}`];
   // Fallback: just open the file
   return [...prefix, file];
 }

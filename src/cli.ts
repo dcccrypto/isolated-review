@@ -24,10 +24,10 @@ program
   .description('Deep code review of a single file in isolation')
   .version('0.11.0');
 
-function wrap(fn: () => Promise<string>) {
-  return async () => {
+function wrapAction<A extends unknown[]>(fn: (...args: A) => Promise<string>) {
+  return async (...args: A) => {
     try {
-      process.stdout.write(await fn());
+      process.stdout.write(await fn(...args));
     } catch (e) {
       if (e instanceof Error && e.name === 'ExitPromptError') {
         console.error('cancelled.');
@@ -38,21 +38,8 @@ function wrap(fn: () => Promise<string>) {
     }
   };
 }
-
-function wrapArg<A>(fn: (arg: A) => Promise<string>) {
-  return async (arg: A) => {
-    try {
-      process.stdout.write(await fn(arg));
-    } catch (e) {
-      if (e instanceof Error && e.name === 'ExitPromptError') {
-        console.error('cancelled.');
-        process.exit(130);
-      }
-      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
-      process.exit(1);
-    }
-  };
-}
+const wrap    = wrapAction;
+const wrapArg = wrapAction;
 
 program
   .command('init')
@@ -61,15 +48,7 @@ program
   .option('--key <value>',          'API key value, "@/path/to/file", or "-" to read from stdin')
   .option('--default-model <name>', 'set the default model at the same time')
   .option('--yes',                  'confirm non-interactive mode without any prompts')
-  .action(async (opts: { provider?: 'anthropic' | 'openai' | 'openrouter'; key?: string; defaultModel?: string; yes?: boolean }) => {
-    try {
-      process.stdout.write(await runInit(opts));
-    } catch (e) {
-      if (e instanceof Error && e.name === 'ExitPromptError') { console.error('cancelled.'); process.exit(130); }
-      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
-      process.exit(1);
-    }
-  });
+  .action(wrapAction(async (opts: { provider?: 'anthropic' | 'openai' | 'openrouter'; key?: string; defaultModel?: string; yes?: boolean }) => runInit(opts)));
 
 program
   .command('keys')
@@ -77,19 +56,7 @@ program
   .option('--provider <name>',  'which provider to set (required with --from-stdin or --from-file)')
   .option('--from-stdin',       'read the key from stdin (no terminal paste, no truncation risk)')
   .option('--from-file <path>', 'read the key from a file')
-  .action(async (opts: { provider?: 'anthropic'|'openai'|'openrouter'; fromStdin?: boolean; fromFile?: string }) => {
-    try {
-      const out = await runKeysSetup(opts);
-      process.stdout.write(out);
-    } catch (e) {
-      if (e instanceof Error && e.name === 'ExitPromptError') {
-        console.error('cancelled.');
-        process.exit(130);
-      }
-      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
-      process.exit(1);
-    }
-  });
+  .action(wrapAction(async (opts: { provider?: 'anthropic'|'openai'|'openrouter'; fromStdin?: boolean; fromFile?: string }) => runKeysSetup(opts)));
 
 program
   .command('settings')
@@ -109,14 +76,7 @@ program
 program
   .command('completion <shell>')
   .description('Print a shell completion script (bash | zsh | fish). Install instructions in the script comments.')
-  .action(async (shell: string) => {
-    try {
-      process.stdout.write(await runCompletion(shell));
-    } catch (e) {
-      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
-      process.exit(1);
-    }
-  });
+  .action(wrapAction(runCompletion));
 
 const promptsCmd = program
   .command('prompts')
@@ -133,18 +93,7 @@ promptsCmd.command('show <name>')
   .action(wrapArg(runPromptShow));
 promptsCmd.command('generate [name] [description]')
   .description('AI-generate a custom reviewer prompt from a one-line description')
-  .action(async (name: string | undefined, description: string | undefined) => {
-    try {
-      process.stdout.write(await runPromptGenerate(name, description));
-    } catch (e) {
-      if (e instanceof Error && e.name === 'ExitPromptError') {
-        console.error('cancelled.');
-        process.exit(130);
-      }
-      console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
-      process.exit(1);
-    }
-  });
+  .action(wrapAction(runPromptGenerate));
 
 program
   .argument('[file]',            'path to the file to review (omit with --pick to choose interactively)')
