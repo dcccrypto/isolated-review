@@ -2,6 +2,9 @@
 import { Command } from 'commander';
 import { runReview, type ReviewOpts } from './commands/review.js';
 import { EFFORT_LEVELS, type Effort } from './providers/types.js';
+import { copyToClipboard } from './utils/clipboard.js';
+import { waitForKey } from './utils/keypress.js';
+import { createTheme } from './utils/theme.js';
 import { runKeysSetup } from './commands/keys.js';
 import { runSettings } from './commands/settings.js';
 import { runInit } from './commands/init.js';
@@ -15,7 +18,7 @@ const program = new Command();
 program
   .name('review')
   .description('Deep code review of a single file in isolation')
-  .version('0.9.1');
+  .version('0.10.0');
 
 function wrap(fn: () => Promise<string>) {
   return async () => {
@@ -121,9 +124,10 @@ program
   .option('--effort <level>',    `reasoning effort: ${EFFORT_LEVELS.join(' | ')}. Claude 4.x maps to extended thinking budget; GPT-5.x / o-series maps to reasoning_effort; OpenRouter passes through.`)
   .option('--prompt <name>',     'use a named prompt preset (run "review prompts" to list)', 'default')
   .option('--prompt-file <path>','use the system prompt from an ad-hoc file (mutually exclusive with --prompt)')
+  .option('--copy',              'copy a shareable markdown summary to the clipboard after the review', false)
   .option('--json',              'emit machine-readable JSON', false)
   .option('--plain',             'disable color and unicode formatting', false)
-  .action(async (file: string | undefined, rawOpts: Omit<ReviewOpts, 'diff' | 'effort'> & { diff?: string | boolean; pick?: boolean; effort?: string }) => {
+  .action(async (file: string | undefined, rawOpts: Omit<ReviewOpts, 'diff' | 'effort'> & { diff?: string | boolean; pick?: boolean; effort?: string; copy?: boolean }) => {
     const d = rawOpts.diff;
     const diff: string | undefined =
       d === undefined || d === false ? undefined
@@ -148,7 +152,8 @@ program
         process.exit(1);
       }
       const output = await runReview(target, opts);
-      console.log(output);
+      console.log(output.text);
+      await postRender(output.markdown, { autoCopy: !!rawOpts.copy, json: opts.json, plain: opts.plain });
     } catch (e) {
       if (e instanceof Error && e.name === 'ExitPromptError') {
         console.error('cancelled.');
@@ -158,5 +163,36 @@ program
       process.exit(1);
     }
   });
+
+async function postRender(markdown: string | undefined, ctx: { autoCopy: boolean; json: boolean; plain: boolean }): Promise<void> {
+  if (!markdown) return;
+  const t = createTheme({ plain: ctx.plain });
+
+  if (ctx.autoCopy) {
+    try {
+      await copyToClipboard(markdown);
+      process.stderr.write(` ${t.ok(t.sym.check)} ${t.muted('copied markdown summary to clipboard')}\n`);
+    } catch (e) {
+      process.stderr.write(` ${t.medium(t.sym.medium)} ${t.muted('copy failed:')} ${e instanceof Error ? e.message : String(e)}\n`);
+    }
+    return;
+  }
+
+  if (ctx.json) return;
+  if (!process.stdout.isTTY) return;
+  if (!process.stdin.isTTY) return;
+
+  process.stdout.write(` ${t.dim('[')}${t.accent('c')}${t.dim('] copy markdown  ')}${t.dim('[')}${t.accent('q')}${t.dim('] quit  ')}${t.dim('(auto-exits in 10s)')}\n`);
+  const key = await waitForKey(10_000);
+  if (!key) return;
+  if (key.name === 'c') {
+    try {
+      await copyToClipboard(markdown);
+      process.stdout.write(` ${t.ok(t.sym.check)} ${t.muted('copied')}\n`);
+    } catch (e) {
+      process.stdout.write(` ${t.medium(t.sym.medium)} ${t.muted('copy failed:')} ${e instanceof Error ? e.message : String(e)}\n`);
+    }
+  }
+}
 
 program.parseAsync();

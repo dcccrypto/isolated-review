@@ -82,9 +82,9 @@ describe('runReview', () => {
     expect(anthropicReview).toHaveBeenCalledTimes(1);
     expect(openaiReview).not.toHaveBeenCalled();
     expect(anthropicReview.mock.calls[0]![0]).toBe('claude-sonnet-4-6');
-    expect(out).toContain('review');
-    expect(out).toContain('Looks good.');
-    expect(out).toContain('Critical  (1)');
+    expect(out.text).toContain('review');
+    expect(out.text).toContain('Looks good.');
+    expect(out.text).toContain('Critical  (1)');
     rmSync(file.dir, { recursive: true });
   });
 
@@ -134,9 +134,9 @@ describe('runReview', () => {
     expect(openaiReview).toHaveBeenCalledTimes(1);
     expect(anthropicVerify).toHaveBeenCalledTimes(1);
     expect(anthropicVerify.mock.calls[0]![2]).toEqual(primary);
-    expect(out).toContain('VERIFIED');
-    expect(out).toContain('Refined pass.');
-    expect(out).toContain('0 critical · 0 medium · 0 low');
+    expect(out.text).toContain('VERIFIED');
+    expect(out.text).toContain('Refined pass.');
+    expect(out.text).toContain('0 critical · 0 medium · 0 low');
     rmSync(file.dir, { recursive: true });
   });
 
@@ -152,7 +152,7 @@ describe('runReview', () => {
       model: 'claude', verify: 'gpt-4o', patch: false, json: true, plain: false
     });
 
-    const parsed = JSON.parse(out);
+    const parsed = JSON.parse(out.text);
     expect(parsed.schemaVersion).toBe(1);
     expect(parsed.model).toBe('claude-sonnet-4-6');
     expect(parsed.verifierModel).toBe('gpt-4o');
@@ -259,10 +259,10 @@ describe('runReview', () => {
       model: 'claude-opus', patch: false, json: false, plain: true
     });
 
-    expect(out).toMatch(/2\.8k in/);
-    expect(out).toMatch(/1\.2k cached/);
-    expect(out).toMatch(/893 out/);
-    expect(out).toMatch(/\$/);
+    expect(out.text).toMatch(/2\.8k in/);
+    expect(out.text).toMatch(/1\.2k cached/);
+    expect(out.text).toMatch(/893 out/);
+    expect(out.text).toMatch(/\$/);
     rmSync(file.dir, { recursive: true });
   });
 });

@@ -124,6 +124,7 @@ review ./src/file.rs --patch
 | `--patch` | Ask the reviewer to include suggested patches (unified diff). |
 | `--diff [base]` | Review only lines changed vs a git base (default: `HEAD`). Great for PR workflows. Falls back to a full-file review with a stderr note for untracked files. |
 | `--effort <level>` | Reasoning effort: `none` / `minimal` / `low` / `medium` / `high` / `xhigh`. Maps to Anthropic extended thinking, OpenAI `reasoning_effort`, or OpenRouter `reasoning.effort`. See "Reasoning effort" below. |
+| `--copy` | After the review, copy a pasteable markdown summary (for Slack / PR comments / Linear) to the system clipboard. No waiting; just happens. |
 | `--prompt <name>` | Use a named prompt preset. Run `review prompts` to see the full list. Default: `default`. |
 | `--prompt-file <path>` | Use the system prompt from an ad-hoc file (no need to install it into the config dir). Mutually exclusive with `--prompt`. |
 | `--json` | Emit machine-readable JSON (stable keys, no spinner, pipe into `jq`). |
@@ -319,6 +320,18 @@ Notes:
 - Extended thinking and `reasoning_effort` both **increase cost** (thinking tokens are billed as output). Start with `medium` when in doubt.
 - Claude Haiku and non-reasoning OpenAI models (`gpt-4o` family) don't support the dial — `--effort` is silently ignored for them.
 - Not every OpenAI model accepts every level. `xhigh` and `none` exist only on GPT-5.2+. `minimal` is older-GPT-5 only. o-series accepts `low | medium | high`. If the API rejects the level, you'll get a clean 400 — pick a level the model supports.
+
+### Share the result
+
+After any pretty-mode review, a `[c] copy markdown  [q] quit` bar appears. Press `c` and a clean markdown summary — title + model/cost/count line + grouped findings with `file:line` anchors and fixes — lands on your clipboard, ready to paste into Slack, a PR comment, a Linear ticket, or an email. Press `q` or Enter to skip. The prompt auto-exits after 10 seconds.
+
+For scripts and aliases, skip the hint and copy unconditionally:
+
+```bash
+review src/foo.ts --copy
+```
+
+Clipboard backends: `pbcopy` (macOS), `clip` (Windows), `wl-copy` / `xclip` / `xsel` (Linux — tried in that order). If none are installed the copy fails with a clean message; the review output itself is unaffected.
 
 ### Reliability
 

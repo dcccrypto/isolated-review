@@ -6,6 +6,7 @@ import { openaiProvider } from '../providers/openai.js';
 import { openrouterProvider } from '../providers/openrouter.js';
 import { createTheme } from '../utils/theme.js';
 import { renderJson, renderPretty, type JsonEnvelope } from '../utils/output.js';
+import { toMarkdown } from '../utils/markdown.js';
 import { loadConfig } from '../utils/config.js';
 import { getChangedLineRanges, isTracked } from '../utils/diff.js';
 import { estimateCost } from '../utils/pricing.js';
@@ -30,6 +31,11 @@ export interface ReviewOpts {
   effort?: Effort;
 }
 
+export interface ReviewOutput {
+  text: string;
+  markdown?: string;
+}
+
 function formatBytes(n: number): string {
   if (n < 1000) return `${n}B`;
   if (n < 10_000) return `${(n / 1000).toFixed(1)}kB`;
@@ -51,7 +57,7 @@ function makeTicker(spinner: ReturnType<typeof ora> | null, label: string): OnTo
   };
 }
 
-export async function runReview(filePath: string, opts: ReviewOpts): Promise<string> {
+export async function runReview(filePath: string, opts: ReviewOpts): Promise<ReviewOutput> {
   if (opts.prompt && opts.promptFile) {
     throw new Error('--prompt and --prompt-file are mutually exclusive; pick one');
   }
@@ -136,11 +142,11 @@ export async function runReview(filePath: string, opts: ReviewOpts): Promise<str
       estimatedCostUsd: estimateCost(verifiedResponse ? (verifierModelName ?? primary.model) : primary.model, finalResp.usage) ?? undefined,
       result: finalResp.result
     };
-    return renderJson(envelope);
+    return { text: renderJson(envelope) };
   }
 
   const theme = createTheme({ plain: opts.plain });
-  return renderPretty({
+  const text = renderPretty({
     filePath: file.absolutePath,
     primaryModel: primary.model,
     verifierModel: verifierModelName,
@@ -154,4 +160,13 @@ export async function runReview(filePath: string, opts: ReviewOpts): Promise<str
     primaryUsage: primaryResponse.usage,
     verifierUsage: verifiedResponse?.usage
   });
+  const markdown = toMarkdown({
+    filePath: file.absolutePath,
+    model: primary.model,
+    verifierModel: verifierModelName,
+    result: finalResp.result,
+    elapsedMs,
+    usage: finalResp.usage
+  });
+  return { text, markdown };
 }
